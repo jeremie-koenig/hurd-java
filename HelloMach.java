@@ -1,8 +1,12 @@
+import org.gnu.mach.MachPort;
+import org.gnu.hurd.Hurd;
+
 public class HelloMach {
-    private static native void hello();
+    private static native void hello(MachPort port);
 
     public static void main(String argv[]) {
-        System.loadLibrary("HelloMach");
-        hello();
+        Hurd hurd = new Hurd();
+        System.loadLibrary("hurd-java");
+        hello(hurd.getdport(1));
     }
 }

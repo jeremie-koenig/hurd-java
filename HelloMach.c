@@ -1,12 +1,10 @@
-#define _GNU_SOURCE
 #include <stdio.h>
 #include <string.h>
-#include <mach/port.h>
-#include <mach/message.h>
+#include <mach-java.h>
 #include <hurd.h>
 #include "HelloMach.h"
 
-JNIEXPORT void JNICALL Java_HelloMach_hello (JNIEnv *env, jclass cls)
+JNIEXPORT void JNICALL Java_HelloMach_hello (JNIEnv *env, jclass cls, jobject port)
 {
     static const char *hello = "Hello, World!\n";
     mach_port_t stdoutp;
@@ -31,7 +29,7 @@ JNIEXPORT void JNICALL Java_HelloMach_hello (JNIEnv *env, jclass cls)
         } rep;
     } msg;
 
-    stdoutp = getdport(1);
+    stdoutp = mach_java_getport(env, port);
     mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &replyp);
 
     msg.req.hdr.msgh_bits =
