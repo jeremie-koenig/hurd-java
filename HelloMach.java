@@ -51,9 +51,21 @@ public class HelloMach {
         reply.deallocate();
     }
 
-    public static void main(String argv[]) throws Exception {
+    public static void testHello() throws Exception {
         Hurd hurd = new Hurd();
+        MachPort stdoutp = hurd.getdport(1);
+        hello(stdoutp);
+        stdoutp.deallocate();
+    }
+
+    public static void main(String argv[]) throws Exception {
         System.loadLibrary("hurd-java");
-        hello(hurd.getdport(1));
+
+        testHello();
+
+        for(int i = 0; i < 100; i++) {
+            byte[] foo = new byte[10000000];
+            System.gc();
+        }
     }
 }

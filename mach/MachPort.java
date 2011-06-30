@@ -48,6 +48,13 @@ public class MachPort {
         this.name = DEAD;
     }
 
+    /* Check that the port was deallocated when collected. */
+    protected void finalize() {
+        if(name == DEAD) return;
+        System.err.println(String.format("MachPort: port %d was never deallocated", name));
+        deallocate();
+    }
+
     /**
      * Call mach_port_dellocate().
      *
