@@ -13,7 +13,7 @@ public class HelloMach {
         return remote | (local << 8);
     }
 
-    private static void hello(MachPort stdout) {
+    private static void hello(MachPort stdout) throws Exception {
         ByteBuffer msg = ByteBuffer.allocateDirect(1000);
         MachPort reply = MachPort.allocate();
 
@@ -38,11 +38,20 @@ public class HelloMach {
 
         int err = Mach.msg(msg, Mach.SEND_MSG | Mach.RCV_MSG, reply, Mach.MSG_TIMEOUT_NONE, null);
         System.out.println("err = " + err);
+        msg.position(msg.getInt(4)).flip().position(24);
+
+        MachMsg.Type.INTEGER_32.get(msg);
+        int retcode = msg.getInt();
+        System.out.println("retcode = " + retcode);
+
+        MachMsg.Type.INTEGER_32.get(msg);
+        int amount = msg.getInt();
+        System.out.println("amount = " + amount);
 
         reply.deallocate();
     }
 
-    public static void main(String argv[]) {
+    public static void main(String argv[]) throws Exception {
         Hurd hurd = new Hurd();
         System.loadLibrary("hurd-java");
         hello(hurd.getdport(1));

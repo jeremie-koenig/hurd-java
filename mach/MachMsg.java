@@ -18,6 +18,7 @@ public class MachMsg {
     public static enum Type {
         /* List of types currently in use. Extend as needed. */
         CHAR(8, 8, true),
+        INTEGER_32(2, 32, false),
         INTEGER_64(11, 64, false);
 
         /* Constants for mach_msg_type_t */
@@ -41,6 +42,9 @@ public class MachMsg {
             this.longform = longform;
 
             header = longform ? BIT_LONGFORM : name | (size << 8);
+
+            /* FIXME: for now we support only inline data. */
+            header |= BIT_INLINE;
         }
 
         /* Check a value against the proto-header. */
@@ -48,7 +52,7 @@ public class MachMsg {
         private void checkHeader(int header) throws Exception {
             if((header & CHECKED_BITS) != this.header)
                 throw new Exception(String.format(
-                            "Type check error (%08x instead of %08x)",
+                            "Type check error (0x%x instead of 0x%x)",
                             header, this.header));
         }
 
@@ -57,11 +61,11 @@ public class MachMsg {
         private void checkLongHeader(int name, int size) throws Exception {
             if(name != this.name)
                 throw new Exception(String.format(
-                            "Type check error (name is %04x instead of %04x)",
+                            "Type check error (name is 0x%x instead of 0x%x)",
                             name, this.name));
             if(size != this.size)
                 throw new Exception(String.format(
-                            "Type check error (size is %04x instead of %04x)",
+                            "Type check error (size is 0x%x instead of 0x%x)",
                             size, this.size));
         }
 
