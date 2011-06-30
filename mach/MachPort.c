@@ -16,12 +16,6 @@ Java_org_gnu_mach_MachPort_initIDs(JNIEnv *env, jclass cls)
     assert(nameID != NULL);
 }
 
-JNIEXPORT void JNICALL
-Java_org_gnu_mach_MachPort_nativeDeallocate (JNIEnv *env, jobject obj)
-{
-    mach_port_deallocate(mach_task_self(), mach_java_getport(env, obj));
-}
-
 jobject mach_java_makeport(JNIEnv *env, mach_port_t name)
 {
     if(!cls_MachPort) {
@@ -34,5 +28,24 @@ jobject mach_java_makeport(JNIEnv *env, mach_port_t name)
 
 mach_port_t mach_java_getport(JNIEnv *env, jobject obj)
 {
-    return (*env)->GetIntField(env, obj, nameID);
+    return obj ? (*env)->GetIntField(env, obj, nameID) : MACH_PORT_NULL;
 }
+
+JNIEXPORT jobject JNICALL
+Java_org_gnu_mach_MachPort_allocate(JNIEnv *env, jclass cls)
+{
+    mach_port_t port;
+    kern_return_t err;
+
+    err = mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &port);
+    /* FIXME: handle errors */
+
+    return mach_java_makeport(env, port);
+}
+
+JNIEXPORT void JNICALL
+Java_org_gnu_mach_MachPort_nativeDeallocate(JNIEnv *env, jobject obj)
+{
+    mach_port_deallocate(mach_task_self(), mach_java_getport(env, obj));
+}
+

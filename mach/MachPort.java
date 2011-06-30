@@ -4,8 +4,8 @@ package org.gnu.mach;
  * Mach port name.
  */
 public class MachPort {
-    private static final int NULL = 0;
-    private static final int DEAD = -1;
+    static final int NULL = 0;
+    static final int DEAD = -1;
 
     /**
      * Encapsulated port name.
@@ -21,6 +21,22 @@ public class MachPort {
     private MachPort(int name) {
         this.name = name;
     }
+
+    /**
+     * Return the port name encapsulated by this object.
+     *
+     * FIXME: to be made (package-?) private.
+     */
+    public int name() {
+        return name;
+    }
+
+    /**
+     * Allocate a new port.
+     *
+     * TODO: this could eventually be replaced by the Java-based RPC call.
+     */
+    public static native MachPort allocate();
 
     /**
      * Deallocate this port.
