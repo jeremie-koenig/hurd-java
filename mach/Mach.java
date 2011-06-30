@@ -1,6 +1,9 @@
 package org.gnu.mach;
 import java.nio.ByteBuffer;
 
+/**
+ * Mach system calls.
+ */
 public class Mach {
     public static final long MSG_TIMEOUT_NONE = 0;
 
@@ -28,6 +31,14 @@ public class Mach {
     public static final int RCV_NOTIFY      = 0x00000200;
     public static final int RCV_INTERRUPT   = 0x00000400;
     public static final int RCV_LARGE       = 0x00000800;
+
+    /**
+     * Create a reply port.
+     *
+     * This is a wrapper around the mach_reply_port() system call, which
+     * creates a new MachPort object with the returned name.
+     */
+    public static native MachPort replyPort();
 
     /**
      * Native call to mach_msg().

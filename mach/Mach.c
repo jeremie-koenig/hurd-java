@@ -2,6 +2,13 @@
 #include <mach-java.h>
 #include "Mach.h"
 
+JNIEXPORT jobject JNICALL
+Java_org_gnu_mach_Mach_replyPort (JNIEnv *env, jclass cls)
+{
+    /* FIXME: exception */
+    return mach_java_makeport(env, mach_reply_port());
+}
+
 JNIEXPORT jint JNICALL
 Java_org_gnu_mach_Mach_msg (JNIEnv *env, jclass cls, jobject msg, jint option,
         jobject rcvName, jlong timeout, jobject notify)

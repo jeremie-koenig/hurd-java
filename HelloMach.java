@@ -15,7 +15,7 @@ public class HelloMach {
 
     private static void hello(MachPort stdout) throws Exception {
         ByteBuffer msg = ByteBuffer.allocateDirect(1000);
-        MachPort reply = MachPort.allocate();
+        MachPort reply = Mach.replyPort();
 
         msg.order(ByteOrder.nativeOrder());
 
