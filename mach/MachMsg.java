@@ -92,6 +92,10 @@ public class MachMsg {
                 if(!longform)
                     header |= (num & 0x0fff) << 16;
 
+                /* Align to the next word boundary. FIXME: hardcoded. */
+                while(buf.position() % 4 != 0)
+                    buf.put((byte) 0);
+
                 buf.putInt(header);
                 if(longform) {
                     buf.putShort((short) name);
@@ -135,6 +139,10 @@ public class MachMsg {
             try {
                 int header = buf.getInt();
                 int number;
+
+                /* Align to the next word boundary. FIXME: hardcoded. */
+                while(buf.position() % 4 != 0)
+                    buf.get();
 
                 checkHeader(header);
                 if(longform) {

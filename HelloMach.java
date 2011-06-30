@@ -28,7 +28,7 @@ public class HelloMach {
         msg.putInt(21000);              /* msgh_id */
 
         /* Data */
-        byte data[] = "Hello in Java!_\n".getBytes();
+        byte data[] = "Hello in Java!\n".getBytes();
         MachMsg.Type.CHAR.put(msg, data.length);
         msg.put(data);
 
