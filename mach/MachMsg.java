@@ -14,6 +14,12 @@ public class MachMsg {
      * Mach message. Each member represents a possible data type. The put() and
      * get() methods read and write mach_msg_type_t (or mach_msg_long_type_t)
      * structures to/from a given ByteBuffer object.
+     *
+     * All the methods in this class must offer the guarantee that the buffer's
+     * position stays in a consistent state no matter what happens. In other
+     * words, put() and get() should behave in an atomic manner with respect to
+     * the buffer's position. FIXME: or maybe we could manage this at the
+     * MachMsg level?
      */
     public static enum Type {
         /* List of types currently in use. Extend as needed. */
@@ -71,22 +77,35 @@ public class MachMsg {
 
         /**
          * Write a type descriptor into the given ByteBuffer.
+         *
+         * The buffer's mark is overwritten in all cases.
          */
         public void put(ByteBuffer buf, int num, boolean inl, boolean dealloc) {
-            int header = this.header;
+            buf.mark();
+            try {
+                int header = this.header;
 
-            if(inl)
-                header |= BIT_INLINE;
-            if(dealloc)
-                header |= BIT_DEALLOCATE;
-            if(!longform)
-                header |= (num & 0x0fff) << 16;
+                if(inl)
+                    header |= BIT_INLINE;
+                if(dealloc)
+                    header |= BIT_DEALLOCATE;
+                if(!longform)
+                    header |= (num & 0x0fff) << 16;
 
-            buf.putInt(header);
-            if(longform) {
-                buf.putShort((short) name);
-                buf.putShort((short) size);
-                buf.putInt(num);
+                buf.putInt(header);
+                if(longform) {
+                    buf.putShort((short) name);
+                    buf.putShort((short) size);
+                    buf.putInt(num);
+                }
+            }
+            /* Ensure the buffer stays in a sane state no matter what. */
+            catch(Error exc) {
+                buf.reset();
+                throw exc;
+            } catch(RuntimeException exc) {
+                buf.reset();
+                throw exc;
             }
         }
 
@@ -128,7 +147,14 @@ public class MachMsg {
                 }
                 return number;
             }
-            catch(Exception exc) {
+            /* Ensure the buffer stays in a sane state no matter what. */
+            catch(Error exc) {
+                buf.reset();
+                throw exc;
+            } catch(RuntimeException exc) {
+                buf.reset();
+                throw exc;
+            } catch(Exception exc) {
                 buf.reset();
                 throw exc;
             }
