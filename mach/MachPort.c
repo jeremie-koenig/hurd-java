@@ -38,7 +38,9 @@ Java_org_gnu_mach_MachPort_allocate(JNIEnv *env, jclass cls)
     kern_return_t err;
 
     err = mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &port);
-    /* FIXME: handle errors */
+    if(err != KERN_SUCCESS) {
+        /* FIXME: handle errors */
+    }
 
     return mach_java_makeport(env, port);
 }
