@@ -2,11 +2,10 @@ import java.nio.ByteOrder;
 import java.nio.ByteBuffer;
 import org.gnu.mach.Mach;
 import org.gnu.mach.MachPort;
+import org.gnu.mach.MachMsg;
 import org.gnu.hurd.Hurd;
 
 public class HelloMach {
-    private static final short TYPE_CHAR = 8;
-    //private static final int TYPE_INTEGER_64 = 11;
     private static final short TYPE_COPY_SEND = 19;
     private static final short TYPE_MAKE_SEND_ONCE = 21;
 
@@ -30,14 +29,11 @@ public class HelloMach {
 
         /* Data */
         byte data[] = "Hello in Java!_\n".getBytes();
-        msg.putInt(0x30000000);         /* msgtl_header: inline, longform */
-        msg.putShort(TYPE_CHAR);        /* msgtl_name */
-        msg.putShort((short) 8);        /* msgtl_size */
-        msg.putInt(data.length);        /* msgtl_number */
+        MachMsg.Type.CHAR.put(msg, data.length);
         msg.put(data);
 
         /* Offset */
-        msg.putInt(0x1001400b);
+        MachMsg.Type.INTEGER_64.put(msg);
         msg.putLong(-1);
 
         int err = Mach.msg(msg, Mach.SEND_MSG | Mach.RCV_MSG, reply, Mach.MSG_TIMEOUT_NONE, null);

@@ -34,7 +34,8 @@ test: $(CLASSES) $(JNILIB)
 	LD_LIBRARY_PATH=. java HelloMach
 
 clean:
-	$(RM) $(CLASSES) $(JNILIB) $(JNIOBJS) $(JNIHDRS)
+	$(RM) $(JNILIB) $(JNIOBJS) $(JNIHDRS)
+	find -name \*.class | xargs $(RM)
 
 $(JNIOBJS): $(JNIHDRS)
 .PRECIOUS: %.h
