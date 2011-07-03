@@ -1,16 +1,59 @@
 package org.gnu.mach;
 
 /**
- * Mach port name.
+ * Opaque Mach port name.
+ *
+ * This class encapsulates {@code mach_port_t} values in a safe manner.
+ * Users of the {@link org.gnu.mach} package never manipulate port names
+ * directly. Instead, they refer to ports using MachPort objects.
+ *
+ * MachPort objects generally behave the same way {@code mach_port_t}
+ * values do. They are created when incoming RPC messages are parsed.
+ * The {@link #equals()} method can be used to determine whether two send
+ * right refer to the same object (XXX not implemented yet).
+ *
+ * <h3>Deallocation</h3>
+ *
+ * <h3>Internals</h3>
+ *
+ * Behind the scenes, classes from the {@link org.gnu.mach} package can
+ * acquire the actual {@code mach_port_t} value encapsulated by a MachPort
+ * object. To preserve safety, we must ensure that no matter what happens,
+ * this value remains valid between the time it's acquired and the time it
+ * is actually used.
+ *
+ * The most obvious solution to this problem would be to increment the port's
+ * user reference count using the {@code mach_port_mod_refs()} call. However,
+ * this would incur a significant cost since two such calls would be needed
+ * for every port name included in a message.
+ *
+ * Instead, every MachPort object maintains a reference counter which is
+ * incremented every time the port name is acquired with {@link #name()}.
+ * A non-zero reference counter prevents the object from being deallocated
+ * right away. Instead, if {@link #deallocate()} is called, the actual
+ * deallocation of the port name at the Mach level will be postponed until
+ * the reference counter falls back to zero.
+ *
+ * <h3>JNI interface</h3>
  */
 public class MachPort {
-    static final int NULL = 0;
-    static final int DEAD = -1;
+    public static final MachPort NULL = new MachPort( 0);
+    public static final MachPort DEAD = new MachPort(~0);
 
     /**
      * Encapsulated port name.
      */
     private int name;
+
+    /**
+     * Name reference count.
+     */
+    private int refCnt;
+
+    /**
+     * Whether a deallocation request is pending.
+     */
+    private boolean deallocPending;
 
     /**
      * Instanciate a new MachPort object for the given name.
@@ -20,15 +63,37 @@ public class MachPort {
      */
     private MachPort(int name) {
         this.name = name;
+        refCnt = 0;
+        deallocPending = false;
     }
 
     /**
-     * Return the port name encapsulated by this object.
+     * Get the port name associated with this object.
+     *
+     * This unsafe operation permits access to the port name encapsulated in
+     * this MachPort object. To prevent the name from being rendered invalid
+     * by deallocation after it has been obtained, calling this method will
+     * increment a reference counter. A subsequent deallocation request will
+     * be delayed until {@link #releaseName()} is called.
      *
      * FIXME: to be made (package-?) private.
      */
-    public int name() {
+    public synchronized int name() {
+        refCnt++;
         return name;
+    }
+
+    /**
+     * Release a reference acquired through name().
+     */
+    public synchronized void releaseName() {
+        assert refCnt > 0;
+        refCnt--;
+
+        if(refCnt == 0 && deallocPending) {
+            deallocPending = false;
+            deallocate();
+        }
     }
 
     /**
@@ -41,18 +106,32 @@ public class MachPort {
     /**
      * Deallocate this port.
      *
-     * The current port name is deallocated and replaced with @c MACH_PORT_DEAD.
+     * The port name is deallocated and replaced with {@code MACH_PORT_DEAD}.
      */
     public synchronized void deallocate() {
+        if(refCnt > 0) {
+            /* Postpone */
+            deallocPending = true;
+            return;
+        }
         nativeDeallocate();
-        this.name = DEAD;
+        name = DEAD.name;
+        deallocPending = false;
     }
 
-    /* Check that the port was deallocated when collected. */
+    /* Check that the port was deallocated and has no references left at
+     * collection time. */
     protected void finalize() {
-        if(name == DEAD) return;
-        System.err.println(String.format("MachPort: port %d was never deallocated", name));
-        deallocate();
+        if(refCnt > 0) {
+            System.err.println(String.format(
+                        "MachPort: port name %d was never released", name));
+            refCnt = 0;
+        }
+        if(name != DEAD.name) {
+            System.err.println(String.format(
+                        "MachPort: port %d was never deallocated", name));
+            deallocate();
+        }
     }
 
     /**
