@@ -1,5 +1,7 @@
 package org.gnu.mach;
 
+import java.util.Collection;
+import java.util.ArrayList;
 import java.nio.ByteOrder;
 import java.nio.ByteBuffer;
 
@@ -25,7 +27,9 @@ public class MachMsg {
         /* List of types currently in use. Extend as needed. */
         CHAR(8, 8, true),
         INTEGER_32(2, 32, false),
-        INTEGER_64(11, 64, false);
+        INTEGER_64(11, 64, false),
+        COPY_SEND(19, 32, false),
+        MAKE_SEND_ONCE(21, 32, false);
 
         /* Constants for mach_msg_type_t */
         private static final int BIT_INLINE     = 0x10000000;
@@ -52,6 +56,9 @@ public class MachMsg {
             /* FIXME: for now we support only inline data. */
             header |= BIT_INLINE;
         }
+
+        /** Get this type's name value. */
+        public int value() { return name; }
 
         /* Check a value against the proto-header. */
         /* TODO: custom exception */
@@ -170,9 +177,25 @@ public class MachMsg {
     }
 
     /**
+     * Construct a value for the msgh_bits header field.
+     */
+    private static final int MSGH_BITS(int remote, int local) {
+        return remote | (local << 8);
+    }
+    private static final int MSGH_BITS_COMPLEX = 0x80000000;
+
+    /**
      * The (direct) ByteBuffer backing this message.
      */
-    private ByteBuffer buf;
+    public ByteBuffer buf;
+
+    /* Header data */
+    private MachPort remotePort, localPort;
+    private Type remoteType, localType;
+    private boolean complex;
+
+    /* Extra ports referenced by this message. */
+    private Collection<MachPort> refPorts;
 
     /**
      * Allocate a new message buffer.
@@ -180,6 +203,93 @@ public class MachMsg {
     public MachMsg(int size) {
         buf = ByteBuffer.allocateDirect(size);
         buf.order(ByteOrder.nativeOrder());
+        refPorts = new ArrayList<MachPort>();
+        clear();
+    }
+
+    public ByteBuffer buf() {
+        return buf;
+    }
+
+    /**
+     * Release all port name references held by this message.
+     *
+     * This operation correponds to a partial {@link #clear()} which does
+     * not alter the actual message contents. It is used after a message has
+     * been received to release overwritten port references.
+     */
+    private void clearNames() {
+        /* Release references. */
+        if(remotePort != null)
+            remotePort.releaseName();
+        if(localPort != null)
+            localPort.releaseName();
+        for(MachPort port : refPorts)
+            port.releaseName();
+
+        /* Forget them. */
+        remotePort = null;
+        remoteType = null;
+        localPort = null;
+        localType = null;
+        complex = false;
+        refPorts.clear();
+    }
+
+    /**
+     * Clear the message's contents.
+     */
+    public synchronized MachMsg clear() {
+        /* Release port name references. */
+        clearNames();
+
+        /* Reset the message to a blank header. */
         buf.clear();
+        for(int i = 0; i < 6; i++)
+            buf.putInt(0);
+
+        return this;
+    }
+
+    /** Rewrite the header's @code{msgh_bits} field. */
+    private void putBits() {
+        int remoteBits = (remoteType != null) ? remoteType.value() : 0;
+        int localBits = (localType != null) ? localType.value() : 0;
+        int complexBit = complex ? MSGH_BITS_COMPLEX : 0;
+        buf.putInt(0, MSGH_BITS(remoteBits, localBits) | complexBit);
+    }
+
+    /** Set the header's @code{msgh_remote_port} field. */
+    public synchronized MachMsg setRemotePort(MachPort port, Type type) {
+        if(remotePort != null)
+            remotePort.releaseName();
+
+        remotePort = port;
+        buf.putInt(8, remotePort.name());
+
+        remoteType = type;
+        putBits();
+
+        return this;
+    }
+
+    /** Set the header's @code{msgh_local_port} field. */
+    public synchronized MachMsg setLocalPort(MachPort port, Type type) {
+        if(localPort != null)
+            localPort.releaseName();
+
+        localPort = port;
+        buf.putInt(12, localPort.name());
+
+        localType = type;
+        putBits();
+
+        return this;
+    }
+
+    /** Set the header's @code{msgh_id} field. */
+    public synchronized MachMsg setId(int id) {
+        buf.putInt(20, id);
+        return this;
     }
 }
