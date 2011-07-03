@@ -3,6 +3,8 @@ CFLAGS = -Wall -g
 CPPFLAGS = -D_GNU_SOURCE -I.
 JAVAH = javah
 JAVAC = javac
+JAVADOC = javadoc
+JAVADOCFLAGS = -private -use
 
 # Java class files
 JAVASRCS = $(shell find -name \*.java)
@@ -18,6 +20,11 @@ all: test
 
 $(CLASSES): $(JAVASRCS)
 	$(JAVAC) $(JAVASRCS)
+
+doc: $(JAVASRCS)
+	$(JAVADOC) $(JAVADOCFLAGS) -d $@.n $(JAVASRCS)
+	$(RM) -r $@
+	mv $@.n $@
 
 %.h: %.class
 	$(JAVAH) -cp . -o $@.n $*
