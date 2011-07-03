@@ -251,7 +251,7 @@ public class MachMsg {
         return this;
     }
 
-    /** Rewrite the header's @code{msgh_bits} field. */
+    /** Rewrite the header's {@code msgh_bits} field. */
     private void putBits() {
         int remoteBits = (remoteType != null) ? remoteType.value() : 0;
         int localBits = (localType != null) ? localType.value() : 0;
@@ -259,7 +259,7 @@ public class MachMsg {
         buf.putInt(0, MSGH_BITS(remoteBits, localBits) | complexBit);
     }
 
-    /** Set the header's @code{msgh_remote_port} field. */
+    /** Set the header's {@code msgh_remote_port} field. */
     public synchronized MachMsg setRemotePort(MachPort port, Type type) {
         if(remotePort != null)
             remotePort.releaseName();
@@ -273,7 +273,7 @@ public class MachMsg {
         return this;
     }
 
-    /** Set the header's @code{msgh_local_port} field. */
+    /** Set the header's {@code msgh_local_port} field. */
     public synchronized MachMsg setLocalPort(MachPort port, Type type) {
         if(localPort != null)
             localPort.releaseName();
@@ -287,7 +287,7 @@ public class MachMsg {
         return this;
     }
 
-    /** Set the header's @code{msgh_id} field. */
+    /** Set the header's {@code msgh_id} field. */
     public synchronized MachMsg setId(int id) {
         buf.putInt(20, id);
         return this;
