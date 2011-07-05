@@ -4,7 +4,9 @@ import org.gnu.mach.MachMsg;
 import org.gnu.hurd.Hurd;
 
 public class HelloMach {
-    private static void hello(MachPort stdout) throws Exception {
+    private static void hello(MachPort stdout)
+        throws MachMsg.TypeCheckException
+    {
         MachMsg msg = new MachMsg(1000);
         MachPort reply = Mach.replyPort();
 
@@ -33,14 +35,14 @@ public class HelloMach {
         msg.clear();
     }
 
-    public static void testHello() throws Exception {
+    public static void testHello() throws MachMsg.TypeCheckException {
         Hurd hurd = new Hurd();
         MachPort stdoutp = hurd.getdport(1);
         hello(stdoutp);
         stdoutp.deallocate();
     }
 
-    public static void main(String argv[]) throws Exception {
+    public static void main(String argv[]) throws MachMsg.TypeCheckException {
         System.loadLibrary("hurd-java");
 
         testHello();

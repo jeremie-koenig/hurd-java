@@ -10,6 +10,21 @@ import java.nio.ByteBuffer;
  */
 public class MachMsg {
     /**
+     * Type check exception.
+     *
+     * This exception is raised by {@code MachMsg.get*} operations when the
+     * type descriptor read from the message does not match the expected
+     * value.
+     */
+    public static class TypeCheckException extends Exception {
+        static final long serialVersionUID = -8432763016000561949L;
+
+        public TypeCheckException(String msg) {
+            super(msg);
+        }
+    }
+
+    /**
      * Type descriptor for data items.
      *
      * This enumeration is used to write and check the type descriptors in a
@@ -62,22 +77,24 @@ public class MachMsg {
 
         /* Check a value against the proto-header. */
         /* TODO: custom exception */
-        private void checkHeader(int header) throws Exception {
+        private void checkHeader(int header) throws TypeCheckException {
             if((header & CHECKED_BITS) != this.header)
-                throw new Exception(String.format(
+                throw new TypeCheckException(String.format(
                             "Type check error (0x%x instead of 0x%x)",
                             header, this.header));
         }
 
         /* Check the remainder of a long form header. */
         /* TODO: custom exception */
-        private void checkLongHeader(int name, int size) throws Exception {
+        private void checkLongHeader(int name, int size)
+            throws TypeCheckException
+        {
             if(name != this.name)
-                throw new Exception(String.format(
+                throw new TypeCheckException(String.format(
                             "Type check error (name is 0x%x instead of 0x%x)",
                             name, this.name));
             if(size != this.size)
-                throw new Exception(String.format(
+                throw new TypeCheckException(String.format(
                             "Type check error (size is 0x%x instead of 0x%x)",
                             size, this.size));
         }
@@ -141,7 +158,7 @@ public class MachMsg {
          *
          * TODO: recognize out-of-line data.
          */
-        public int get(ByteBuffer buf) throws Exception {
+        public int get(ByteBuffer buf) throws TypeCheckException {
             buf.mark();
             try {
                 int header = buf.getInt();
@@ -169,7 +186,7 @@ public class MachMsg {
             } catch(RuntimeException exc) {
                 buf.reset();
                 throw exc;
-            } catch(Exception exc) {
+            } catch(TypeCheckException exc) {
                 buf.reset();
                 throw exc;
             }
@@ -182,11 +199,13 @@ public class MachMsg {
          * does, but additionally checks the type descriptor's {@code
          * msgt_number} field instead of returning it.
          */
-        public void get(ByteBuffer buf, int expectedNumber) throws Exception {
+        public void get(ByteBuffer buf, int expectedNumber)
+            throws TypeCheckException
+        {
             int actualNumber = get(buf);
 
             if(actualNumber != expectedNumber)
-                throw new Exception(String.format(
+                throw new TypeCheckException(String.format(
                     "Type check error: msgt_number was %d (expected %d)",
                     actualNumber, expectedNumber));
         }
@@ -366,10 +385,10 @@ public class MachMsg {
     /* Reading data items */
 
     private static interface GetOperation {
-        void operate() throws Exception;
+        void operate() throws TypeCheckException;
     }
 
-    private void atomicGet(GetOperation op) throws Exception {
+    private void atomicGet(GetOperation op) throws TypeCheckException {
         buf.mark();
         try {
             op.operate();
@@ -379,7 +398,7 @@ public class MachMsg {
         } catch(RuntimeException exc) {
             buf.reset();
             throw exc;
-        } catch(Exception exc) {
+        } catch(TypeCheckException exc) {
             buf.reset();
             throw exc;
         }
@@ -388,10 +407,10 @@ public class MachMsg {
     /**
      * Read a {@code MACH_MSG_TYPE_INTEGER_32} data item from this message.
      */
-    public synchronized int getInteger32() throws Exception {
+    public synchronized int getInteger32() throws TypeCheckException {
         final int[] value = new int[1];
         atomicGet(new GetOperation() {
-            public void operate() throws Exception {
+            public void operate() throws TypeCheckException {
                 Type.INTEGER_32.get(buf, 1);
                 value[0] = buf.getInt();
             }
