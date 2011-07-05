@@ -174,6 +174,22 @@ public class MachMsg {
                 throw exc;
             }
         }
+
+        /**
+         * Check the type descriptor read from the given ByteBuffer.
+         *
+         * This version behaves the same was as {@link #get(ByteBuffer)}
+         * does, but additionally checks the type descriptor's {@code
+         * msgt_number} field instead of returning it.
+         */
+        public void get(ByteBuffer buf, int expectedNumber) throws Exception {
+            int actualNumber = get(buf);
+
+            if(actualNumber != expectedNumber)
+                throw new Exception(String.format(
+                    "Type check error: msgt_number was %d (expected %d)",
+                    actualNumber, expectedNumber));
+        }
     }
 
     /**
@@ -291,5 +307,95 @@ public class MachMsg {
     public synchronized MachMsg setId(int id) {
         buf.putInt(20, id);
         return this;
+    }
+
+    /* Writing data items */
+
+    static private interface PutOperation {
+        void operate();
+    }
+
+    private void atomicPut(PutOperation op) {
+        buf.mark();
+        try {
+            op.operate();
+        } catch(Error exc) {
+            buf.reset();
+            throw exc;
+        } catch(RuntimeException exc) {
+            buf.reset();
+            throw exc;
+        }
+    }
+
+    /**
+     * Append a {@code MACH_MSG_TYPE_CHAR} data item to this message.
+     */
+    public synchronized MachMsg putChar(final byte ch) {
+        atomicPut(new PutOperation() {
+            public void operate() {
+                Type.CHAR.put(buf);
+                buf.put(ch);
+            }
+        });
+        return this;
+    }
+    public synchronized MachMsg putChar(final byte[] src) {
+        atomicPut(new PutOperation() {
+            public void operate() {
+                Type.CHAR.put(buf, src.length);
+                buf.put(src);
+            }
+        });
+        return this;
+    }
+
+    /**
+     * Append a {@code MACH_MSG_TYPE_INTEGER_64} data item to this message.
+     */
+    public synchronized MachMsg putInteger64(final long value) {
+        atomicPut(new PutOperation() {
+            public void operate() {
+                Type.INTEGER_64.put(buf);
+                buf.putLong(value);
+            }
+        });
+        return this;
+    }
+
+    /* Reading data items */
+
+    private static interface GetOperation {
+        void operate() throws Exception;
+    }
+
+    private void atomicGet(GetOperation op) throws Exception {
+        buf.mark();
+        try {
+            op.operate();
+        } catch(Error exc) {
+            buf.reset();
+            throw exc;
+        } catch(RuntimeException exc) {
+            buf.reset();
+            throw exc;
+        } catch(Exception exc) {
+            buf.reset();
+            throw exc;
+        }
+    }
+
+    /**
+     * Read a {@code MACH_MSG_TYPE_INTEGER_32} data item from this message.
+     */
+    public synchronized int getInteger32() throws Exception {
+        final int[] value = new int[1];
+        atomicGet(new GetOperation() {
+            public void operate() throws Exception {
+                Type.INTEGER_32.get(buf, 1);
+                value[0] = buf.getInt();
+            }
+        });
+        return value[0];
     }
 }

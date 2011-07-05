@@ -1,5 +1,3 @@
-import java.nio.ByteOrder;
-import java.nio.ByteBuffer;
 import org.gnu.mach.Mach;
 import org.gnu.mach.MachPort;
 import org.gnu.mach.MachMsg;
@@ -16,24 +14,19 @@ public class HelloMach {
         msg.setId(21000);
 
         /* Data */
-        byte data[] = "Hello in Java!\n".getBytes();
-        MachMsg.Type.CHAR.put(msg.buf, data.length);
-        msg.buf.put(data);
+        msg.putChar("Hello in Java!\n".getBytes());
 
         /* Offset */
-        MachMsg.Type.INTEGER_64.put(msg.buf);
-        msg.buf.putLong(-1);
+        msg.putInteger64(-1);
 
         int err = Mach.msg(msg.buf, Mach.SEND_MSG | Mach.RCV_MSG, reply, Mach.MSG_TIMEOUT_NONE, null);
         System.out.println("err = " + err);
         msg.buf.position(msg.buf.getInt(4)).flip().position(24);
 
-        MachMsg.Type.INTEGER_32.get(msg.buf);
-        int retcode = msg.buf.getInt();
+        int retcode = msg.getInteger32();
         System.out.println("retcode = " + retcode);
 
-        MachMsg.Type.INTEGER_32.get(msg.buf);
-        int amount = msg.buf.getInt();
+        int amount = msg.getInteger32();
         System.out.println("amount = " + amount);
 
         reply.deallocate();
