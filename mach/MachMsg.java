@@ -76,7 +76,6 @@ public class MachMsg {
         public int value() { return name; }
 
         /* Check a value against the proto-header. */
-        /* TODO: custom exception */
         private void checkHeader(int header) throws TypeCheckException {
             if((header & CHECKED_BITS) != this.header)
                 throw new TypeCheckException(String.format(
@@ -85,7 +84,6 @@ public class MachMsg {
         }
 
         /* Check the remainder of a long form header. */
-        /* TODO: custom exception */
         private void checkLongHeader(int name, int size)
             throws TypeCheckException
         {
