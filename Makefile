@@ -4,7 +4,7 @@ CPPFLAGS = -D_GNU_SOURCE -I.
 JAVAH = javah
 JAVAC = javac
 JAVADOC = javadoc
-JAVADOCFLAGS = -private -use
+JAVADOCFLAGS = -use
 
 # Java class files
 JAVASRCS = $(shell find -name \*.java)
