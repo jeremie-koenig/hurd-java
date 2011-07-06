@@ -255,12 +255,14 @@ public class MachMsg {
      */
     private void clearNames() {
         /* Release references. */
-        if(remotePort != null)
-            remotePort.releaseName();
-        if(localPort != null)
-            localPort.releaseName();
-        for(MachPort port : refPorts)
-            port.releaseName();
+        try {
+            if(remotePort != null)
+                remotePort.releaseName();
+            if(localPort != null)
+                localPort.releaseName();
+            for(MachPort port : refPorts)
+                port.releaseName();
+        } catch(Unsafe e) {}
 
         /* Forget them. */
         remotePort = null;
@@ -296,11 +298,13 @@ public class MachMsg {
 
     /** Set the header's {@code msgh_remote_port} field. */
     public synchronized MachMsg setRemotePort(MachPort port, Type type) {
-        if(remotePort != null)
-            remotePort.releaseName();
+        try {
+            if(remotePort != null)
+                remotePort.releaseName();
 
-        remotePort = port;
-        buf.putInt(8, remotePort.name());
+            remotePort = port;
+            buf.putInt(8, remotePort.name());
+        } catch(Unsafe e) {}
 
         remoteType = type;
         putBits();
@@ -310,11 +314,13 @@ public class MachMsg {
 
     /** Set the header's {@code msgh_local_port} field. */
     public synchronized MachMsg setLocalPort(MachPort port, Type type) {
-        if(localPort != null)
-            localPort.releaseName();
+        try {
+            if(localPort != null)
+                localPort.releaseName();
 
-        localPort = port;
-        buf.putInt(12, localPort.name());
+            localPort = port;
+            buf.putInt(12, localPort.name());
+        } catch(Unsafe e) {}
 
         localType = type;
         putBits();

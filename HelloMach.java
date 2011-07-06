@@ -1,6 +1,7 @@
 import org.gnu.mach.Mach;
 import org.gnu.mach.MachPort;
 import org.gnu.mach.MachMsg;
+import org.gnu.mach.Unsafe;
 import org.gnu.hurd.Hurd;
 
 public class HelloMach {
@@ -8,7 +9,7 @@ public class HelloMach {
         throws MachMsg.TypeCheckException
     {
         MachMsg msg = new MachMsg(1000);
-        MachPort reply = Mach.replyPort();
+        MachPort reply = MachPort.allocateReplyPort();
 
         /* mach_msg_header_t */
         msg.setRemotePort(stdout, MachMsg.Type.COPY_SEND);
@@ -21,8 +22,16 @@ public class HelloMach {
         /* Offset */
         msg.putInteger64(-1);
 
-        int err = Mach.msg(msg.buf, Mach.SEND_MSG | Mach.RCV_MSG, reply, Mach.MSG_TIMEOUT_NONE, null);
-        System.out.println("err = " + err);
+        try {
+            int err = Mach.msg(msg.buf,
+                               Mach.SEND_MSG | Mach.RCV_MSG,
+                               reply.name(),
+                               Mach.MSG_TIMEOUT_NONE,
+                               MachPort.NULL.name());
+            reply.releaseName();
+            MachPort.NULL.releaseName();
+            System.out.println("err = " + err);
+        } catch(Unsafe e) {}
         msg.buf.position(msg.buf.getInt(4)).flip().position(24);
 
         int retcode = msg.getInteger32();

@@ -13,7 +13,8 @@ CLASSES = $(patsubst %.java,%.class,$(JAVASRCS))
 # JNI shared library
 JNILIB = libhurd-java.so
 JNISRCS = $(shell find -name \*.c)
-JNIHDRS = $(patsubst %.c,%.h,$(JNISRCS))
+JNIHDRS = mach/Mach.h mach/Mach$$Port.h hurd/Hurd.h
+
 JNIOBJS = $(patsubst %.c,%.o,$(JNISRCS))
 
 all: test
@@ -26,9 +27,9 @@ doc: $(JAVASRCS)
 	$(RM) -r $@
 	mv $@.n $@
 
-%.h: %.class
-	$(JAVAH) -cp . -o $@.n $*
-	mv $@.n $@
+%.h: $(CLASSES)
+	$(JAVAH) -cp . -o '$@.n' '$*'
+	mv '$@.n' '$@'
 
 %.o: %.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ -c $<
@@ -41,7 +42,7 @@ test: $(CLASSES) $(JNILIB)
 	LD_LIBRARY_PATH=. java HelloMach
 
 clean:
-	$(RM) $(JNILIB) $(JNIOBJS) $(JNIHDRS)
+	$(RM) $(JNILIB) $(JNIOBJS) $(patsubst %,'%',$(JNIHDRS))
 	find -name \*.class | xargs $(RM)
 
 $(JNIOBJS): $(JNIHDRS)

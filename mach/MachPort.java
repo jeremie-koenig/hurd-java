@@ -37,8 +37,26 @@ package org.gnu.mach;
  * <h3>JNI interface</h3>
  */
 public class MachPort {
-    public static final MachPort NULL = new MachPort( 0);
-    public static final MachPort DEAD = new MachPort(~0);
+    public static MachPort NULL;
+    public static MachPort DEAD;
+
+    static {
+        try {
+            NULL = new MachPort( 0);
+            DEAD = new MachPort(~0);
+        } catch(Unsafe e) { }
+    }
+
+    /**
+     * Port rights for {@link MachPort#allocate}.
+     */
+    public static enum Right {
+        SEND,
+        RECEIVE,
+        SEND_ONCE,
+        PORT_SET,
+        DEAD_NAME;
+    }
 
     /**
      * Encapsulated port name.
@@ -61,7 +79,8 @@ public class MachPort {
      * This consumes one reference to @p name. The reference will be released
      * when deallocate() is called, or when the new object is collected.
      */
-    private MachPort(int name) {
+    @SuppressWarnings("unused")
+    public MachPort(int name) throws Unsafe {
         this.name = name;
         refCnt = 0;
         deallocPending = false;
@@ -75,10 +94,9 @@ public class MachPort {
      * by deallocation after it has been obtained, calling this method will
      * increment a reference counter. A subsequent deallocation request will
      * be delayed until {@link #releaseName()} is called.
-     *
-     * FIXME: to be made (package-?) private.
      */
-    public synchronized int name() {
+    @SuppressWarnings("unused")
+    public synchronized int name() throws Unsafe {
         refCnt++;
         return name;
     }
@@ -86,7 +104,8 @@ public class MachPort {
     /**
      * Release a reference acquired through name().
      */
-    public synchronized void releaseName() {
+    @SuppressWarnings("unused")
+    public synchronized void releaseName() throws Unsafe {
         assert refCnt > 0;
         refCnt--;
 
@@ -97,11 +116,35 @@ public class MachPort {
     }
 
     /**
-     * Allocate a new port.
-     *
-     * TODO: this could eventually be replaced by the Java-based RPC call.
+     * Allocate a new reply port.
      */
-    public static native MachPort allocate();
+    public static MachPort allocateReplyPort() {
+        try {
+            int name = Mach.replyPort();
+            return new MachPort(name);
+        } catch(Unsafe e) {
+            return null;
+        }
+    }
+
+    /**
+     * Allocate a new port name.
+     */
+    public static MachPort allocate(Right right) {
+        try {
+            int name = Mach.Port.allocate(Mach.taskSelf(), right.ordinal());
+            return new MachPort(name);
+        } catch(Unsafe e) {
+            return null;
+        }
+    }
+
+    /**
+     * Allocate a new receive port right.
+     */
+    public static MachPort allocate() {
+        return allocate(Right.RECEIVE);
+    }
 
     /**
      * Deallocate this port.
@@ -114,7 +157,9 @@ public class MachPort {
             deallocPending = true;
             return;
         }
-        nativeDeallocate();
+        try {
+            Mach.Port.deallocate(Mach.taskSelf(), name);
+        } catch(Unsafe e) {}
         name = DEAD.name;
         deallocPending = false;
     }
@@ -132,19 +177,6 @@ public class MachPort {
                         "MachPort: port %d was never deallocated", name));
             deallocate();
         }
-    }
-
-    /**
-     * Call mach_port_dellocate().
-     *
-     * TODO: this could eventually be replaced by the Java-based RPC call.
-     */
-    private native void nativeDeallocate();
-
-    /* JNI code initialization */
-    private static native void initIDs();
-    static {
-        initIDs();
     }
 };
 
