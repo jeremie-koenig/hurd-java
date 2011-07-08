@@ -28,15 +28,15 @@ public class MachMsg {
      * Type descriptor for data items.
      *
      * This enumeration is used to write and check the type descriptors in a
-     * Mach message. Each member represents a possible data type. The put() and
-     * get() methods read and write mach_msg_type_t (or mach_msg_long_type_t)
-     * structures to/from a given ByteBuffer object.
+     * Mach message. Each member represents a possible data type.  The
+     * {@link #put} and {@link #get} methods read and write {@code
+     * mach_msg_type_t} (or {@code mach_msg_long_type_t}) structures from/to
+     * a given ByteBuffer object.
      *
-     * All the methods in this class must offer the guarantee that the buffer's
-     * position stays in a consistent state no matter what happens. In other
-     * words, put() and get() should behave in an atomic manner with respect to
-     * the buffer's position. FIXME: or maybe we could manage this at the
-     * MachMsg level?
+     * In case an exception occurs, the buffer position can be anywhere
+     * between its original value and the end of the type descriptor being
+     * read or written. Users are advised to set the buffer's mark before
+     * using these methods and restore it if an exception occurs.
      */
     public static enum Type {
         /* List of types currently in use. Extend as needed. */
@@ -99,39 +99,26 @@ public class MachMsg {
 
         /**
          * Write a type descriptor into the given ByteBuffer.
-         *
-         * The buffer's mark is overwritten in all cases.
          */
         public void put(ByteBuffer buf, int num, boolean inl, boolean dealloc) {
-            buf.mark();
-            try {
-                int header = this.header;
+            int header = this.header;
 
-                if(inl)
-                    header |= BIT_INLINE;
-                if(dealloc)
-                    header |= BIT_DEALLOCATE;
-                if(!longform)
-                    header |= (num & 0x0fff) << 16;
+            if(inl)
+                header |= BIT_INLINE;
+            if(dealloc)
+                header |= BIT_DEALLOCATE;
+            if(!longform)
+                header |= (num & 0x0fff) << 16;
 
-                /* Align to the next word boundary. FIXME: hardcoded. */
-                while(buf.position() % 4 != 0)
-                    buf.put((byte) 0);
+            /* Align to the next word boundary. FIXME: hardcoded. */
+            while(buf.position() % 4 != 0)
+                buf.put((byte) 0);
 
-                buf.putInt(header);
-                if(longform) {
-                    buf.putShort((short) name);
-                    buf.putShort((short) size);
-                    buf.putInt(num);
-                }
-            }
-            /* Ensure the buffer stays in a sane state no matter what. */
-            catch(Error exc) {
-                buf.reset();
-                throw exc;
-            } catch(RuntimeException exc) {
-                buf.reset();
-                throw exc;
+            buf.putInt(header);
+            if(longform) {
+                buf.putShort((short) name);
+                buf.putShort((short) size);
+                buf.putInt(num);
             }
         }
 
@@ -149,45 +136,30 @@ public class MachMsg {
          * @param buf The buffer to read the type descriptor from.
          * @return The number of elements.
          *
-         * If the type checking fails, an exception is thrown and the buffer is
-         * restored to its original position.
-         *
-         * The buffer's mark is overwritten in all cases.
+         * If the type checking fails, an exception is thrown. As for any
+         * other exception, when that occurs the buffer position is
+         * unspecified.
          *
          * TODO: recognize out-of-line data.
          */
         public int get(ByteBuffer buf) throws TypeCheckException {
-            buf.mark();
-            try {
-                int header = buf.getInt();
-                int number;
+            int header = buf.getInt();
+            int number;
 
-                /* Align to the next word boundary. FIXME: hardcoded. */
-                while(buf.position() % 4 != 0)
-                    buf.get();
+            /* Align to the next word boundary. FIXME: hardcoded. */
+            while(buf.position() % 4 != 0)
+                buf.get();
 
-                checkHeader(header);
-                if(longform) {
-                    int name = buf.getShort();
-                    int size = buf.getShort();
-                    checkLongHeader(name, size);
-                    number = buf.getInt();
-                } else {
-                    number = (header >> 16) & 0x0fff;
-                }
-                return number;
+            checkHeader(header);
+            if(longform) {
+                int name = buf.getShort();
+                int size = buf.getShort();
+                checkLongHeader(name, size);
+                number = buf.getInt();
+            } else {
+                number = (header >> 16) & 0x0fff;
             }
-            /* Ensure the buffer stays in a sane state no matter what. */
-            catch(Error exc) {
-                buf.reset();
-                throw exc;
-            } catch(RuntimeException exc) {
-                buf.reset();
-                throw exc;
-            } catch(TypeCheckException exc) {
-                buf.reset();
-                throw exc;
-            }
+            return number;
         }
 
         /**
