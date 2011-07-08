@@ -23,7 +23,7 @@ public class HelloMach {
         msg.putInteger64(-1);
 
         try {
-            int err = Mach.msg(msg.buf,
+            int err = Mach.msg(msg.buf(),
                                Mach.SEND_MSG | Mach.RCV_MSG,
                                reply.name(),
                                Mach.MSG_TIMEOUT_NONE,

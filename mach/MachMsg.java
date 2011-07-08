@@ -220,7 +220,7 @@ public class MachMsg {
     /**
      * The (direct) ByteBuffer backing this message.
      */
-    public ByteBuffer buf;
+    private ByteBuffer buf;
 
     /* Header data */
     private MachPort remotePort, localPort;
@@ -240,7 +240,8 @@ public class MachMsg {
         clear();
     }
 
-    public ByteBuffer buf() {
+    @SuppressWarnings("unused")
+    public ByteBuffer buf() throws Unsafe {
         return buf;
     }
 
