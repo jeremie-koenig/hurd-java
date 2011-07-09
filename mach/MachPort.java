@@ -14,27 +14,20 @@ package org.gnu.mach;
  *
  * <h3>Deallocation</h3>
  *
- * <h3>Internals</h3>
+ * <h3>Unsafe access</h3>
  *
- * Behind the scenes, classes from the {@link org.gnu.mach} package can
- * acquire the actual {@code mach_port_t} value encapsulated by a MachPort
- * object. To preserve safety, we must ensure that no matter what happens,
- * this value remains valid between the time it's acquired and the time it
- * is actually used.
+ * The encapsulated port name can be retreived by unsafe code using the
+ * {@link #name} and {@link #clear} methods.
  *
- * The most obvious solution to this problem would be to increment the port's
- * user reference count using the {@code mach_port_mod_refs()} call. However,
- * this would incur a significant cost since two such calls would be needed
- * for every port name included in a message.
+ * To ensure the port name remains valid between the time it's acquired and
+ * the time it is actually used, {@link #name} increments an external
+ * reference counter. Calls to {@link #clear} and {@link #deallocate} will
+ * block until the external reference is released using {@link #releaseName}.
  *
- * Instead, every MachPort object maintains a reference counter which is
- * incremented every time the port name is acquired with {@link #name()}.
- * A non-zero reference counter prevents the object from being deallocated
- * right away. Instead, if {@link #deallocate()} is called, the actual
- * deallocation of the port name at the Mach level will be postponed until
- * the reference counter falls back to zero.
- *
- * <h3>JNI interface</h3>
+ * By contrast, {@link #clear} replaces the encapsulated port name with
+ * {@code MACH_PORT_DEAD} and returns its previous value to the caller,
+ * which becomes responsible for the corresponding Mach user reference
+ * previously associated with the {@link MachPort} object.
  */
 public class MachPort {
     public static MachPort NULL;
@@ -69,11 +62,6 @@ public class MachPort {
     private int refCnt;
 
     /**
-     * Whether a deallocation request is pending.
-     */
-    private boolean deallocPending;
-
-    /**
      * Instanciate a new MachPort object for the given name.
      *
      * This consumes one reference to @p name. The reference will be released
@@ -83,17 +71,16 @@ public class MachPort {
     public MachPort(int name) throws Unsafe {
         this.name = name;
         refCnt = 0;
-        deallocPending = false;
     }
 
     /**
-     * Get the port name associated with this object.
+     * Acquire the port name associated with this object.
      *
      * This unsafe operation permits access to the port name encapsulated in
      * this MachPort object. To prevent the name from being rendered invalid
      * by deallocation after it has been obtained, calling this method will
-     * increment a reference counter. A subsequent deallocation request will
-     * be delayed until {@link #releaseName()} is called.
+     * increment the external reference counter. Any deallocation request
+     * will block until {@link #releaseName()} is called.
      */
     @SuppressWarnings("unused")
     public synchronized int name() throws Unsafe {
@@ -108,11 +95,46 @@ public class MachPort {
     public synchronized void releaseName() throws Unsafe {
         assert refCnt > 0;
         refCnt--;
+        notifyAll();
+    }
 
-        if(refCnt == 0 && deallocPending) {
-            deallocPending = false;
-            deallocate();
-        }
+    /**
+     * Replace the port name encapsulated by this object with MACH_PORT_DEAD.
+     *
+     * The previous port name is not deallocated, but is instead returned to
+     * the caller. It is the caller's responsability to ensure that the
+     * corresponding Mach-level port right reference does not leak.
+     *
+     * If external references to the port name exist, the call will block
+     * until they have all been released.
+     */
+    @SuppressWarnings("unused")
+    public synchronized int clear() throws Unsafe {
+        if(name != DEAD.name)
+            while(refCnt > 0)
+                try {
+                    wait();
+                } catch(InterruptedException exc) {
+                    /* ignore */
+                }
+
+        int oldName = name;
+        name = DEAD.name;
+        return oldName;
+    }
+
+    /**
+     * Deallocate this port.
+     *
+     * The encapsulated port name is replaced with {@code MACH_PORT_DEAD}.
+     * If external references to the port name exist, the call will block
+     * until they have all been released.
+     */
+    public synchronized void deallocate() {
+        try {
+            int name = clear();
+            Mach.Port.deallocate(Mach.taskSelf(), name);
+        } catch(Unsafe e) {}
     }
 
     /**
@@ -144,24 +166,6 @@ public class MachPort {
      */
     public static MachPort allocate() {
         return allocate(Right.RECEIVE);
-    }
-
-    /**
-     * Deallocate this port.
-     *
-     * The port name is deallocated and replaced with {@code MACH_PORT_DEAD}.
-     */
-    public synchronized void deallocate() {
-        if(refCnt > 0) {
-            /* Postpone */
-            deallocPending = true;
-            return;
-        }
-        try {
-            Mach.Port.deallocate(Mach.taskSelf(), name);
-        } catch(Unsafe e) {}
-        name = DEAD.name;
-        deallocPending = false;
     }
 
     /* Check that the port was deallocated and has no references left at
