@@ -31,7 +31,7 @@ public class HelloMach {
             reply.releaseName();
             MachPort.NULL.releaseName();
             System.out.println("err = " + err);
-            msg.buf().position(msg.buf().getInt(4)).flip().position(24);
+            msg.flip();
         } catch(Unsafe e) {}
 
         int retcode = msg.getInteger32();

@@ -7,6 +7,29 @@ import java.nio.ByteBuffer;
 
 /**
  * Safe Mach message buffer.
+ *
+ * <h3>Embedded port names and {@link MachPort} objects</h3>
+ *
+ * Mach messages store port names in their header and ini some of the
+ * subsequent data items. To avoid port rights from being accidentally
+ * deallocated or leaked, we must handle them carefully.
+ *
+ * When a {@link MachMsg} object is initially created, or after it has been
+ * cleared, the header's port names are initialized to {@code MACH_PORT_NULL}
+ * and no correponding {@link MachMsg} object exists. When port names are
+ * added to the message contents through the {@link #setRemotePort} and
+ * {@link #setLocalPort} methods or through one of the {@code put}
+ * operations, on of two things can happen depending on the associated
+ * {@link MachMsg.Type} used.
+ *
+ * If the port type is {@link MachMsg.Type#COPY_SEND}, {@link
+ * MachMsg.Type#MAKE_SEND} or {@link MachMsg.Type#MAKE_SEND_ONCE}), the port
+ * name is acquired using {@link MachPort#name()} and is kept as long as the
+ * buffer contains the port name in question.
+ *
+ * If the port type is {@link MachMsg.Type#MOVE_RECEIVE}, {@link
+ * MachMsg.Type#MOVE_SEND} or {@link MachMsg.Type#MOVE_SEND_ONCE}, the port
+ * name is acquired using {@link MachPort#clear()}.
  */
 public class MachMsg {
     /**
@@ -19,6 +42,9 @@ public class MachMsg {
     public static class TypeCheckException extends Exception {
         static final long serialVersionUID = -8432763016000561949L;
 
+        public TypeCheckException() {
+            super();
+        }
         public TypeCheckException(String msg) {
             super(msg);
         }
@@ -43,8 +69,17 @@ public class MachMsg {
         CHAR(8, 8, true),
         INTEGER_32(2, 32, false),
         INTEGER_64(11, 64, false),
-        COPY_SEND(19, 32, false),
-        MAKE_SEND_ONCE(21, 32, false);
+        MOVE_RECEIVE(16, 32, false, true),
+        MOVE_SEND(17, 32, false, true),
+        MOVE_SEND_ONCE(18, 32, false, true),
+        COPY_SEND(19, 32, false, false),
+        MAKE_SEND(20, 32, false, false),
+        MAKE_SEND_ONCE(21, 32, false, false);
+
+        /* Aliases used for received ports. */
+        public static final Type PORT_RECEIVE = MOVE_RECEIVE;
+        public static final Type PORT_SEND = MOVE_SEND;
+        public static final Type PORT_SEND_ONCE = MOVE_SEND_ONCE;
 
         /* Constants for mach_msg_type_t */
         private static final int BIT_INLINE     = 0x10000000;
@@ -56,6 +91,7 @@ public class MachMsg {
         private int name;
         private int size;
         private boolean longform;
+        private boolean port, deallocPort;
 
         /* Pre-constructed proto-header */
         private int header;
@@ -71,9 +107,24 @@ public class MachMsg {
             /* FIXME: for now we support only inline data. */
             header |= BIT_INLINE;
         }
+        private Type(int name, int size, boolean longform, boolean dep) {
+            this(name, size, longform);
+            port = true;
+            deallocPort = dep;
+        }
 
         /** Get this type's name value. */
         public int value() { return name; }
+
+        /** Whether this is a port type. */
+        public boolean isPort() {
+            return port;
+        }
+
+        /** Whether this is a deallocating port type. */
+        public boolean isDeallocatedPort() {
+            return deallocPort;
+        }
 
         /* Check a value against the proto-header. */
         private void checkHeader(int header) throws TypeCheckException {
@@ -184,8 +235,14 @@ public class MachMsg {
     /**
      * Construct a value for the msgh_bits header field.
      */
-    private static final int MSGH_BITS(int remote, int local) {
+    private static int MSGH_BITS(int remote, int local) {
         return remote | (local << 8);
+    }
+    private static int MSGH_BITS_REMOTE(int bits) {
+        return bits & 0xff;
+    }
+    private static int MSGH_BITS_LOCAL(int bits) {
+        return (bits >> 8) & 0xff;
     }
     private static final int MSGH_BITS_COMPLEX = 0x80000000;
 
@@ -194,8 +251,85 @@ public class MachMsg {
      */
     private ByteBuffer buf;
 
-    /* Header data */
-    private MachPort remotePort, localPort;
+    /**
+     * Manage port names stored in the header.
+     */
+    private class HeaderPort {
+        /**
+         * Index into {@link MachPort#buf} for the port name we manage.
+         */
+        private int index;
+
+        /**
+         * MachPort object for the port name we manage. If non-null, we hold
+         * one external reference to the name. The object is either provided
+         * by the user or created on their behalf, and it is always their
+         * responsability to {@link MachPort#deallocate} it.
+         */
+        private MachPort port;
+
+        /** Initialize for a given index in {@link MachMsg#buf}. */
+        public HeaderPort(int index) {
+            this.index = index;
+            port = null;
+        }
+
+        /** Prepare to read from the buffer. */
+        public void flip() throws Unsafe { 
+            if(port != null) {
+                port.releaseName();
+                port = null;
+            }
+        }
+
+        /** Set to MACH_PORT_NULL. */
+        public void clear() {
+            try {
+                /* A port name which was never accessed must be deallocated. */
+                if(port == null) {
+                    MachPort tmp = new MachPort(buf.getInt(index));
+                    tmp.deallocate();
+                }
+                buf.putInt(index, 0);
+                flip();
+            } catch(Unsafe exc) {}
+        }
+
+        public void set(MachPort newPort, Type type) {
+            if(newPort == null)
+                throw new NullPointerException();
+            if(!type.isPort())
+                throw new IllegalArgumentException();
+
+            try {
+                /* Release any port name we have. */
+                if(port != null)
+                    port.releaseName();
+
+                if(type.isDeallocatedPort()) {
+                    /* The name will be deallocated, so clear newPort. */
+                    buf.putInt(index, newPort.clear());
+                    port = null;
+                } else {
+                    /* Otherwise, acquire an external name reference. */
+                    buf.putInt(index, newPort.name());
+                    port = newPort;
+                }
+            } catch(Unsafe exc) {}
+        }
+
+        public MachPort get() {
+            if(port == null) {
+                try {
+                    port = new MachPort(buf.getInt(index));
+                    port.name();
+                } catch(Unsafe exc) {}
+            }
+            return port;
+        }
+    }
+
+    private HeaderPort remotePort, localPort;
     private Type remoteType, localType;
     private boolean complex;
 
@@ -208,6 +342,8 @@ public class MachMsg {
     public MachMsg(int size) {
         buf = ByteBuffer.allocateDirect(size);
         buf.order(ByteOrder.nativeOrder());
+        remotePort = new HeaderPort(8);
+        localPort = new HeaderPort(12);
         refPorts = new ArrayList<MachPort>();
         clear();
     }
@@ -224,23 +360,10 @@ public class MachMsg {
      * not alter the actual message contents. It is used after a message has
      * been received to release overwritten port references.
      */
-    private void clearNames() {
-        /* Release references. */
-        try {
-            if(remotePort != null)
-                remotePort.releaseName();
-            if(localPort != null)
-                localPort.releaseName();
-            for(MachPort port : refPorts)
-                port.releaseName();
-        } catch(Unsafe e) {}
+    private void releaseNames() throws Unsafe {
+        for(MachPort port : refPorts)
+            port.releaseName();
 
-        /* Forget them. */
-        remotePort = null;
-        remoteType = null;
-        localPort = null;
-        localType = null;
-        complex = false;
         refPorts.clear();
     }
 
@@ -248,8 +371,15 @@ public class MachMsg {
      * Clear the message's contents.
      */
     public synchronized MachMsg clear() {
+        /* Clear the header. */
+        remotePort.clear();
+        remoteType = null;
+        localPort.clear();
+        localType = null;
+        complex = false;
+
         /* Release port name references. */
-        clearNames();
+        try { releaseNames(); } catch(Unsafe exc) {}
 
         /* Reset the message to a blank header. */
         buf.clear();
@@ -257,6 +387,23 @@ public class MachMsg {
             buf.putInt(0);
 
         return this;
+    }
+
+    /**
+     * 
+     */
+    public synchronized void flip() throws Unsafe {
+        /* Flip header ports. */
+        remotePort.flip();
+        localPort.flip();
+
+        /* Release port name references. */
+        releaseNames();
+
+        /* Read the new values */
+        buf.clear();
+        buf.limit(buf.getInt(4));
+        buf.position(24);
     }
 
     /** Rewrite the header's {@code msgh_bits} field. */
@@ -269,34 +416,56 @@ public class MachMsg {
 
     /** Set the header's {@code msgh_remote_port} field. */
     public synchronized MachMsg setRemotePort(MachPort port, Type type) {
-        try {
-            if(remotePort != null)
-                remotePort.releaseName();
-
-            remotePort = port;
-            buf.putInt(8, remotePort.name());
-        } catch(Unsafe e) {}
-
+        remotePort.set(port, type);
         remoteType = type;
         putBits();
-
         return this;
+    }
+
+    /**
+     * Get the header's {@code msgh_remote_port} field.
+     *
+     * The remote port is type checked against the given type, which should
+     * be {@link MachMsg.Type.PORT_RECEIVE}, {@link MachMsg.Type.PORT_SEND}
+     * or {@link MachMsg.Type.PORT_SEND_ONCE}. If the types match, the port
+     * name is encapsulated into a new {@link MachPort} object and returned.
+     * Subsequent calls will return the same {@link MachPort} object.
+     */
+    public synchronized MachPort getRemotePort(Type type)
+        throws TypeCheckException
+    {
+        int typeVal = MSGH_BITS_REMOTE(buf.getInt(0));
+        if(typeVal != type.value())
+            throw new TypeCheckException();
+
+        return remotePort.get();
     }
 
     /** Set the header's {@code msgh_local_port} field. */
     public synchronized MachMsg setLocalPort(MachPort port, Type type) {
-        try {
-            if(localPort != null)
-                localPort.releaseName();
-
-            localPort = port;
-            buf.putInt(12, localPort.name());
-        } catch(Unsafe e) {}
-
+        localPort.set(port, type);
         localType = type;
         putBits();
-
         return this;
+    }
+
+    /**
+     * Get the header's {@code msgh_local_port} field.
+     *
+     * The local port is type checked against the given type, which should
+     * be {@link MachMsg.Type.PORT_RECEIVE}, {@link MachMsg.Type.PORT_SEND}
+     * or {@link MachMsg.Type.PORT_SEND_ONCE}. If the types match, the port
+     * name is encapsulated into a new {@link MachPort} object and returned.
+     * Subsequent calls will return the same {@link MachPort} object.
+     */
+    public synchronized MachPort getLocalPort(Type type)
+        throws TypeCheckException
+    {
+        int typeVal = MSGH_BITS_LOCAL(buf.getInt(0));
+        if(typeVal != type.value())
+            throw new TypeCheckException();
+
+        return localPort.get();
     }
 
     /** Set the header's {@code msgh_id} field. */
@@ -304,6 +473,12 @@ public class MachMsg {
         buf.putInt(20, id);
         return this;
     }
+
+    /** Get the header's {@code msgh_id} field. */
+    public synchronized int getId() {
+        return buf.getInt(20);
+    }
+
 
     /* Writing data items */
 
