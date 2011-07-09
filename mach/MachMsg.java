@@ -55,9 +55,9 @@ public class MachMsg {
      *
      * This enumeration is used to write and check the type descriptors in a
      * Mach message. Each member represents a possible data type.  The
-     * {@link #put} and {@link #get} methods read and write {@code
-     * mach_msg_type_t} (or {@code mach_msg_long_type_t}) structures from/to
-     * a given ByteBuffer object.
+     * {@link #put} and {@link #get} methods read and write
+     * {@code mach_msg_type_t} (or {@code mach_msg_long_type_t}) structures
+     * from/to a given ByteBuffer object.
      *
      * In case an exception occurs, the buffer position can be anywhere
      * between its original value and the end of the type descriptor being
@@ -217,8 +217,8 @@ public class MachMsg {
          * Check the type descriptor read from the given ByteBuffer.
          *
          * This version behaves the same was as {@link #get(ByteBuffer)}
-         * does, but additionally checks the type descriptor's {@code
-         * msgt_number} field instead of returning it.
+         * does, but additionally checks the type descriptor's
+         * {@code msgt_number} field instead of returning it.
          */
         public void get(ByteBuffer buf, int expectedNumber)
             throws TypeCheckException

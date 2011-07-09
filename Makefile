@@ -23,7 +23,9 @@ $(CLASSES): $(JAVASRCS)
 	$(JAVAC) $(JAVASRCS)
 
 doc: $(JAVASRCS)
-	$(JAVADOC) $(JAVADOCFLAGS) -d $@.n $(JAVASRCS)
+	#$(JAVADOC) $(JAVADOCFLAGS) -d $@.n $(JAVASRCS)
+	# Use doxygen for now
+	doxygen
 	$(RM) -r $@
 	mv $@.n $@
 
