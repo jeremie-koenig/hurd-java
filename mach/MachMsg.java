@@ -274,7 +274,12 @@ public class MachMsg {
             port = null;
         }
 
-        /** Prepare to read from the buffer. */
+        /**
+         * Prepare to read from the buffer.
+         *
+         * We assume old port value was modified behind our back, and was
+         * deallocated as required by the associated type descriptor.
+         */
         public void flip() throws Unsafe { 
             if(port != null) {
                 port.releaseName();
@@ -382,6 +387,9 @@ public class MachMsg {
         localPort.clear();
         localType = null;
         complex = false;
+
+        /* FIXME: if a received message was not read completely, we leak the
+         * remaining port rights and out-of-line memory. */
 
         /* Release port name references. */
         try { releaseNames(); } catch(Unsafe exc) {}

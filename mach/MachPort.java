@@ -52,7 +52,7 @@ package org.gnu.mach;
  * Note that to preserve safety, {@link MachPort} must be {@code final}, so
  * using a subclass for special ports unfortunately is not an option.
  */
-public class MachPort {
+public final class MachPort {
     /**
      * {@link MachPort} object for {@code MACH_PORT_NULL}.
      */
@@ -206,6 +206,7 @@ public class MachPort {
 
     /* Check that the port was deallocated and has no references left at
      * collection time. */
+    @Override
     protected void finalize() {
         if(refCnt > 0) {
             System.err.println(String.format(
