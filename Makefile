@@ -3,6 +3,7 @@ CFLAGS = -Wall -g
 CPPFLAGS = -D_GNU_SOURCE -I.
 JAVAH = javah
 JAVAC = javac
+JAVA = LD_LIBRARY_PATH=.$${LD_LIBRARY_PATH:+:$$LD_LIBRARY_PATH} java
 JAVADOC = javadoc
 JAVADOCFLAGS = -use
 
@@ -41,7 +42,7 @@ $(JNILIB): $(JNIOBJS)
 
 test: $(CLASSES) $(JNILIB)
 	echo $(JAVASRCS)
-	LD_LIBRARY_PATH=. java HelloMach
+	$(JAVA) HelloMach
 
 clean:
 	$(RM) $(JNILIB) $(JNIOBJS) $(patsubst %,'%',$(JNIHDRS))
