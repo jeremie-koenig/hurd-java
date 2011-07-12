@@ -31,7 +31,7 @@ doc: $(JAVASRCS)
 	mv $@.n $@
 
 %.h: $(CLASSES)
-	$(JAVAH) -cp . -o '$@.n' '$*'
+	$(JAVAH) -cp . -o '$@.n' org.gnu.$(subst /,.,'$*')
 	mv '$@.n' '$@'
 
 %.o: %.c
