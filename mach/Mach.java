@@ -88,6 +88,9 @@ public class Mach {
      * functionality will eventually be replaced by MIG-generated stubs.
      */
     public static class Port {
+        public static final int NULL = 0;
+        public static final int DEAD = ~0;
+
         public static final int RIGHT_SEND = 0;
         public static final int RIGHT_RECEIVE = 1;
         public static final int RIGHT_SEND_ONCE = 2;

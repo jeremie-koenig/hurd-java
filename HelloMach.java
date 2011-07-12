@@ -27,9 +27,8 @@ public class HelloMach {
                                Mach.SEND_MSG | Mach.RCV_MSG,
                                reply.name(),
                                Mach.MSG_TIMEOUT_NONE,
-                               MachPort.NULL.name());
+                               Mach.Port.NULL);
             reply.releaseName();
-            MachPort.NULL.releaseName();
             System.out.println("err = " + err);
             msg.flip();
         } catch(Unsafe e) {}

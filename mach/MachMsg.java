@@ -287,25 +287,25 @@ public class MachMsg {
             try {
                 /* A port name which was never accessed must be deallocated. */
                 if(port == null) {
-                    MachPort tmp = new MachPort(buf.getInt(index));
-                    tmp.deallocate();
+                    int name = buf.getInt(index);
+                    if(name != Mach.Port.NULL)
+                        new MachPort(name).deallocate();
                 }
-                buf.putInt(index, 0);
+                buf.putInt(index, Mach.Port.NULL);
                 flip();
             } catch(Unsafe exc) {}
         }
 
         public void set(MachPort newPort, Type type) {
-            if(newPort == null)
-                throw new NullPointerException();
             if(!type.isPort())
                 throw new IllegalArgumentException();
 
-            try {
-                /* Release any port name we have. */
-                if(port != null)
-                    port.releaseName();
+            /* Release any port name we have. */
+            clear();
+            if(newPort == MachPort.NULL)
+                return;
 
+            try {
                 if(type.isDeallocatedPort()) {
                     /* The name will be deallocated, so clear newPort. */
                     buf.putInt(index, newPort.clear());
@@ -320,10 +320,15 @@ public class MachMsg {
 
         public MachPort get() {
             if(port == null) {
-                try {
-                    port = new MachPort(buf.getInt(index));
-                    port.name();
-                } catch(Unsafe exc) {}
+                int name = buf.getInt(index);
+                if(name != Mach.Port.NULL) {
+                    /* Create a new MachPort object and indicate that we
+                     * hold an external reference to the port name. */
+                    try {
+                        port = new MachPort(name);
+                        port.name();
+                    } catch(Unsafe exc) {}
+                }
             }
             return port;
         }

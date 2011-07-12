@@ -28,16 +28,52 @@ package org.gnu.mach;
  * {@code MACH_PORT_DEAD} and returns its previous value to the caller,
  * which becomes responsible for the corresponding Mach user reference
  * previously associated with the {@link MachPort} object.
+ *
+ * <h3>Special port names</h3>
+ *
+ * One particular concern is how we should handle the special port names
+ * {@code MACH_PORT_NULL} and {@code MACH_PORT_DEAD}. The constants
+ * {@link MachPort#NULL} and {@link MachPort#DEAD} are provided as the safe
+ * equivalents. However we must consider the possibility that they could be
+ * mutated by {@link #clear} or {@link #deallocate}.
+ *
+ * Since both of these methods replace the encapsulated port name with
+ * {@link Mach.Port.DEAD}, this is an issue only with {@link MachPort#NULL}.
+ * So far we specify that the user code should explicitely check for it and
+ * handle it consequently, and {@link MachPort#NULL} is defined to
+ * {@code null}. It is clumsy, though.
+ *
+ * Alternatively we could check the encapsulated port name explicitely so
+ * that {@code NULL} stays {@code NULL} even when it's {@link #clear
+ * cleared}. Another possibility would be to provide static wrappers for
+ * {@link #name}, {@link #releaseName} and {@link #clear} which would handle
+ * the case of a {@code null} reference.
+ *
+ * Note that to preserve safety, {@link MachPort} must be {@code final}, so
+ * using a subclass for special ports unfortunately is not an option.
  */
 public class MachPort {
-    public static MachPort NULL;
-    public static MachPort DEAD;
+    /**
+     * {@link MachPort} object for {@code MACH_PORT_NULL}.
+     */
+    public static final MachPort NULL = null;
 
+    /**
+     * {@link MachPort} object for {@code MACH_PORT_DEAD}.
+     */
+    public static final MachPort DEAD;
+
+    /* This elaborate initialization is to silence compiler warnings
+     * about Unsafe being unhandled. */
     static {
+        MachPort dead;
         try {
-            NULL = new MachPort( 0);
-            DEAD = new MachPort(~0);
-        } catch(Unsafe e) { }
+            dead = new MachPort(Mach.Port.DEAD);
+        } catch(Unsafe e) {
+            assert false;
+            dead = null;
+        }
+        DEAD = dead;
     }
 
     /**
@@ -119,7 +155,7 @@ public class MachPort {
                 }
 
         int oldName = name;
-        name = DEAD.name;
+        name = Mach.Port.DEAD;
         return oldName;
     }
 
@@ -176,7 +212,7 @@ public class MachPort {
                         "MachPort: port name %d was never released", name));
             refCnt = 0;
         }
-        if(name != DEAD.name) {
+        if(name != Mach.Port.DEAD) {
             System.err.println(String.format(
                         "MachPort: port %d was never deallocated", name));
             deallocate();
