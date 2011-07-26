@@ -1,19 +1,21 @@
 import org.gnu.mach.Mach;
 import org.gnu.mach.MachPort;
 import org.gnu.mach.MachMsg;
+import org.gnu.mach.MachMsgType;
+import org.gnu.mach.TypeCheckException;
 import org.gnu.mach.Unsafe;
 import org.gnu.hurd.Hurd;
 
 public class HelloMach {
     private static void hello(MachPort stdout)
-        throws MachMsg.TypeCheckException
+        throws TypeCheckException
     {
         MachMsg msg = new MachMsg(1000);
         MachPort reply = MachPort.allocateReplyPort();
 
         /* mach_msg_header_t */
-        msg.setRemotePort(stdout, MachMsg.Type.COPY_SEND);
-        msg.setLocalPort(reply, MachMsg.Type.MAKE_SEND_ONCE);
+        msg.setRemotePort(stdout, MachMsgType.COPY_SEND);
+        msg.setLocalPort(reply, MachMsgType.MAKE_SEND_ONCE);
         msg.setId(21000);
 
         /* Data */
@@ -43,14 +45,14 @@ public class HelloMach {
         msg.clear();
     }
 
-    public static void testHello() throws MachMsg.TypeCheckException {
+    public static void testHello() throws TypeCheckException {
         Hurd hurd = new Hurd();
         MachPort stdoutp = hurd.getdport(1);
         hello(stdoutp);
         stdoutp.deallocate();
     }
 
-    public static void main(String argv[]) throws MachMsg.TypeCheckException {
+    public static void main(String argv[]) throws TypeCheckException {
         System.loadLibrary("hurd-java");
 
         testHello();
