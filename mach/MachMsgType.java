@@ -15,22 +15,24 @@ import java.nio.ByteBuffer;
  * read or written. Users are advised to set the buffer's mark before
  * using these methods and restore it if an exception occurs.
  */
-public enum MachMsgType {
-    /* List of types currently in use. Extend as needed. */
-    CHAR(8, 8, true),
-    INTEGER_32(2, 32, false),
-    INTEGER_64(11, 64, false),
-    MOVE_RECEIVE(16, 32, false, true),
-    MOVE_SEND(17, 32, false, true),
-    MOVE_SEND_ONCE(18, 32, false, true),
-    COPY_SEND(19, 32, false, false),
-    MAKE_SEND(20, 32, false, false),
-    MAKE_SEND_ONCE(21, 32, false, false);
+public class MachMsgType {
+    public static final MachMsgType
 
-    /* Aliases used for received ports. */
-    public static final MachMsgType PORT_RECEIVE = MOVE_RECEIVE;
-    public static final MachMsgType PORT_SEND = MOVE_SEND;
-    public static final MachMsgType PORT_SEND_ONCE = MOVE_SEND_ONCE;
+        /* List of types currently in use. Extend as needed. */
+        CHAR =              new MachMsgType(8, 8, true),
+        INTEGER_32 =        new MachMsgType(2, 32, false),
+        INTEGER_64 =        new MachMsgType(11, 64, false),
+        MOVE_RECEIVE =      new MachMsgType(16, 32, false, true),
+        MOVE_SEND =         new MachMsgType(17, 32, false, true),
+        MOVE_SEND_ONCE =    new MachMsgType(18, 32, false, true),
+        COPY_SEND =         new MachMsgType(19, 32, false, false),
+        MAKE_SEND =         new MachMsgType(20, 32, false, false),
+        MAKE_SEND_ONCE =    new MachMsgType(21, 32, false, false),
+
+        /* Aliases used for received ports. */
+        PORT_RECEIVE =      MOVE_RECEIVE,
+        PORT_SEND =         MOVE_SEND,
+        PORT_SEND_ONCE =    MOVE_SEND_ONCE;
 
     /* Constants for mach_msg_type_t */
     private static final int BIT_INLINE     = 0x10000000;
