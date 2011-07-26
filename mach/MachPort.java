@@ -48,11 +48,8 @@ package org.gnu.mach;
  * cleared}. Another possibility would be to provide static wrappers for
  * {@link #name}, {@link #releaseName} and {@link #clear} which would handle
  * the case of a {@code null} reference.
- *
- * Note that to preserve safety, {@link MachPort} must be {@code final}, so
- * using a subclass for special ports unfortunately is not an option.
  */
-public final class MachPort {
+public class MachPort {
     /**
      * {@link MachPort} object for {@code MACH_PORT_NULL}.
      */
@@ -119,7 +116,7 @@ public final class MachPort {
      * will block until {@link #releaseName()} is called.
      */
     @SuppressWarnings("unused")
-    public synchronized int name() throws Unsafe {
+    public final synchronized int name() throws Unsafe {
         refCnt++;
         return name;
     }
@@ -128,7 +125,7 @@ public final class MachPort {
      * Release a reference acquired through name().
      */
     @SuppressWarnings("unused")
-    public synchronized void releaseName() throws Unsafe {
+    public final synchronized void releaseName() throws Unsafe {
         assert refCnt > 0;
         refCnt--;
         notifyAll();
@@ -145,7 +142,7 @@ public final class MachPort {
      * until they have all been released.
      */
     @SuppressWarnings("unused")
-    public synchronized int clear() throws Unsafe {
+    public final synchronized int clear() throws Unsafe {
         if(name != DEAD.name)
             while(refCnt > 0)
                 try {
@@ -207,7 +204,7 @@ public final class MachPort {
     /* Check that the port was deallocated and has no references left at
      * collection time. */
     @Override
-    protected void finalize() {
+    protected final void finalize() {
         if(refCnt > 0) {
             System.err.println(String.format(
                         "MachPort: port name %d was never released", name));
