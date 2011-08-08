@@ -22,12 +22,12 @@ public class MachMsgType {
         CHAR =              new MachMsgType(8, 8, true),
         INTEGER_32 =        new MachMsgType(2, 32, false),
         INTEGER_64 =        new MachMsgType(11, 64, false),
-        MOVE_RECEIVE =      new MachMsgType(16, 32, false, true),
-        MOVE_SEND =         new MachMsgType(17, 32, false, true),
-        MOVE_SEND_ONCE =    new MachMsgType(18, 32, false, true),
-        COPY_SEND =         new MachMsgType(19, 32, false, false),
-        MAKE_SEND =         new MachMsgType(20, 32, false, false),
-        MAKE_SEND_ONCE =    new MachMsgType(21, 32, false, false),
+        MOVE_RECEIVE =      new MachMsgType(16, 32, false),
+        MOVE_SEND =         new MachMsgType(17, 32, false),
+        MOVE_SEND_ONCE =    new MachMsgType(18, 32, false),
+        COPY_SEND =         new MachMsgType(19, 32, false),
+        MAKE_SEND =         new MachMsgType(20, 32, false),
+        MAKE_SEND_ONCE =    new MachMsgType(21, 32, false),
 
         /* Aliases used for received ports. */
         PORT_RECEIVE =      MOVE_RECEIVE,
@@ -41,13 +41,12 @@ public class MachMsgType {
     private static final int CHECKED_BITS   = 0xf000ffff;
 
     /* Characteristics of this type */
-    private int name;
-    private int size;
-    private boolean longform;
-    private boolean port, deallocPort;
+    private final int name;
+    private final int size;
+    private final boolean longform;
 
     /* Pre-constructed proto-header */
-    private int header;
+    private final int header;
 
     /* Fill-in the data and build the proto-header */
     private MachMsgType(int name, int size, boolean longform) {
@@ -55,28 +54,31 @@ public class MachMsgType {
         this.size = size;
         this.longform = longform;
 
-        header = longform ? BIT_LONGFORM : name | (size << 8);
-
         /* FIXME: for now we support only inline data. */
-        header |= BIT_INLINE;
-    }
-    private MachMsgType(int name, int size, boolean longform, boolean dep) {
-        this(name, size, longform);
-        port = true;
-        deallocPort = dep;
+        header = (longform ? BIT_LONGFORM : name | (size << 8)) | BIT_INLINE;
     }
 
     /** Get this type's name value. */
-    public int value() { return name; }
+    public final int value() { return name; }
 
-    /** Whether this is a port type. */
-    public boolean isPort() {
-        return port;
+    /**
+     * Whether this is a port type.
+     *
+     * This corresponds to the {@code MACH_MSG_TYPE_PORT_ANY} C preprocessor
+     * macro from {@code <mach/message.h>}.
+     */
+    public final boolean isPort() {
+        return (name >= MOVE_RECEIVE.name) && (name <= MAKE_SEND_ONCE.name);
     }
 
-    /** Whether this is a deallocating port type. */
-    public boolean isDeallocatedPort() {
-        return deallocPort;
+    /**
+     * Whether this is a deallocating port type.
+     *
+     * This corresponds to the {@code MACH_MSG_TYPE_PORT_ANY_RIGHT} C
+     * preprocessor macro from {@code <mach/message.h>}.
+     */
+    public final boolean isDeallocatedPort() {
+        return (name >= MOVE_RECEIVE.name) && (name <= MOVE_SEND_ONCE.name);
     }
 
     /* Check a value against the proto-header. */
@@ -104,7 +106,7 @@ public class MachMsgType {
     /**
      * Write a type descriptor into the given ByteBuffer.
      */
-    public void put(ByteBuffer buf, int num, boolean inl, boolean dealloc) {
+    public final void put(ByteBuffer buf, int num, boolean inl, boolean dealloc) {
         int header = this.header;
 
         if(inl)
@@ -127,10 +129,10 @@ public class MachMsgType {
     }
 
     /* Convenience versions. */
-    public void put(ByteBuffer buf, int num) {
+    public final void put(ByteBuffer buf, int num) {
         put(buf, num, true, false);
     }
-    public void put(ByteBuffer buf) {
+    public final void put(ByteBuffer buf) {
         put(buf, 1);
     }
 
@@ -146,7 +148,7 @@ public class MachMsgType {
      *
      * TODO: recognize out-of-line data.
      */
-    public int get(ByteBuffer buf) throws TypeCheckException {
+    public final int get(ByteBuffer buf) throws TypeCheckException {
         int header = buf.getInt();
         int number;
 
@@ -173,7 +175,7 @@ public class MachMsgType {
      * does, but additionally checks the type descriptor's
      * {@code msgt_number} field instead of returning it.
      */
-    public void get(ByteBuffer buf, int expectedNumber)
+    public final void get(ByteBuffer buf, int expectedNumber)
         throws TypeCheckException
     {
         int actualNumber = get(buf);
