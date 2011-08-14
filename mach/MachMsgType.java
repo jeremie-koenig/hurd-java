@@ -148,7 +148,7 @@ public class MachMsgType {
      *
      * TODO: recognize out-of-line data.
      */
-    public final int get(ByteBuffer buf) throws TypeCheckException {
+    public final int check(ByteBuffer buf) throws TypeCheckException {
         int header = buf.getInt();
         int number;
 
@@ -175,10 +175,10 @@ public class MachMsgType {
      * does, but additionally checks the type descriptor's
      * {@code msgt_number} field instead of returning it.
      */
-    public final void get(ByteBuffer buf, int expectedNumber)
+    public final void check(ByteBuffer buf, int expectedNumber)
         throws TypeCheckException
     {
-        int actualNumber = get(buf);
+        int actualNumber = check(buf);
 
         if(actualNumber != expectedNumber)
             throw new TypeCheckException(String.format(

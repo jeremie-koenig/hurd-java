@@ -376,7 +376,7 @@ public class MachMsg {
         final int[] value = new int[1];
         atomicGet(new GetOperation() {
             public void operate() throws TypeCheckException {
-                MachMsgType.INTEGER_32.get(buf, 1);
+                MachMsgType.INTEGER_32.check(buf, 1);
                 value[0] = buf.getInt();
             }
         });
