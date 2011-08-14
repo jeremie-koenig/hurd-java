@@ -44,22 +44,30 @@ public class MachMsgType {
     private final int name;
     private final int size;
     private final boolean longform;
+    private final int number;
 
     /* Pre-constructed proto-header */
     private final int header;
 
     /* Fill-in the data and build the proto-header */
-    private MachMsgType(int name, int size, boolean longform) {
+    private MachMsgType(int name, int size, boolean longform, int number) {
         this.name = name;
         this.size = size;
         this.longform = longform;
+        this.number = number;
 
         /* FIXME: for now we support only inline data. */
         header = (longform ? BIT_LONGFORM : name | (size << 8)) | BIT_INLINE;
     }
+    private MachMsgType(int name, int size, boolean longform) {
+        this(name, size, longform, 1);
+    }
 
     /** Get this type's name value. */
     public final int value() { return name; }
+
+    /** Get this type descriptor's number field. */
+    public final int number() { return number; }
 
     /**
      * Whether this is a port type.
@@ -133,7 +141,7 @@ public class MachMsgType {
         put(buf, num, true, false);
     }
     public final void put(ByteBuffer buf) {
-        put(buf, 1);
+        put(buf, number);
     }
 
     /**
