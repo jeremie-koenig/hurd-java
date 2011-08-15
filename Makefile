@@ -1,10 +1,11 @@
 CC = gcc
 CFLAGS = -Wall -g
 CPPFLAGS = -D_GNU_SOURCE -I.
-JAVAH = javah
-JAVAC = javac
+JAVA_PREFIX =
+JAVAH = $(JAVA_PREFIX)javah
+JAVAC = $(JAVA_PREFIX)javac
 JAVA = LD_LIBRARY_PATH=.$${LD_LIBRARY_PATH:+:$$LD_LIBRARY_PATH} java
-JAVADOC = javadoc
+JAVADOC = $(JAVA_PREFIX)javadoc
 JAVADOCFLAGS = -use
 
 # Java class files
