@@ -159,6 +159,29 @@ public class MachMsgType {
     }
 
     /**
+     * Read a type descriptor from the given ByteBuffer.
+     */
+    public static MachMsgType get(ByteBuffer buf) {
+        align(buf);
+
+        int header = buf.getInt();
+        boolean longform = (header & BIT_LONGFORM) != 0;
+        int name, size, number;
+
+        if(longform) {
+            name = buf.getShort();
+            size = buf.getShort();
+            number = buf.getInt();
+        } else {
+            name = header & 0xff;
+            size = (header >> 8) & 0xff;
+            number = (header >> 16) & 0x0fff;
+        }
+
+        return new MachMsgType(name, size, longform, number);
+    }
+
+    /**
      * Check the type descriptor read from the given ByteBuffer.
      *
      * @param buf The buffer to read the type descriptor from.
