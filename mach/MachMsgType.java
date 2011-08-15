@@ -89,6 +89,13 @@ public class MachMsgType {
         return (name >= MOVE_RECEIVE.name) && (name <= MOVE_SEND_ONCE.name);
     }
 
+    /* Align the position of buf to the next word boundary. */
+    private static void align(ByteBuffer buf) {
+        /* FIXME: hardcoded for 32 bits architectures. */
+        while(buf.position() % 4 != 0)
+            buf.put((byte) 0);
+    }
+
     /* Check a value against the proto-header. */
     private void checkHeader(int header) throws TypeCheckException {
         if((header & CHECKED_BITS) != this.header)
@@ -124,9 +131,7 @@ public class MachMsgType {
         if(!longform)
             header |= (num & 0x0fff) << 16;
 
-        /* Align to the next word boundary. FIXME: hardcoded. */
-        while(buf.position() % 4 != 0)
-            buf.put((byte) 0);
+        align(buf);
 
         buf.putInt(header);
         if(longform) {
@@ -157,12 +162,10 @@ public class MachMsgType {
      * TODO: recognize out-of-line data.
      */
     public final int check(ByteBuffer buf) throws TypeCheckException {
+        align(buf);
+
         int header = buf.getInt();
         int number;
-
-        /* Align to the next word boundary. FIXME: hardcoded. */
-        while(buf.position() % 4 != 0)
-            buf.get();
 
         checkHeader(header);
         if(longform) {
