@@ -221,8 +221,8 @@ public class MachMsg {
 
     /** Rewrite the header's {@code msgh_bits} field. */
     private void putBits() {
-        int remoteBits = (remoteType != null) ? remoteType.value() : 0;
-        int localBits = (localType != null) ? localType.value() : 0;
+        int remoteBits = (remoteType != null) ? remoteType.name() : 0;
+        int localBits = (localType != null) ? localType.name() : 0;
         int complexBit = complex ? MSGH_BITS_COMPLEX : 0;
         buf.putInt(0, MSGH_BITS(remoteBits, localBits) | complexBit);
     }
@@ -248,7 +248,7 @@ public class MachMsg {
         throws TypeCheckException
     {
         int typeVal = MSGH_BITS_REMOTE(buf.getInt(0));
-        if(typeVal != type.value())
+        if(typeVal != type.name())
             throw new TypeCheckException();
 
         return remotePort.get();
@@ -275,7 +275,7 @@ public class MachMsg {
         throws TypeCheckException
     {
         int typeVal = MSGH_BITS_LOCAL(buf.getInt(0));
-        if(typeVal != type.value())
+        if(typeVal != type.name())
             throw new TypeCheckException();
 
         return localPort.get();
