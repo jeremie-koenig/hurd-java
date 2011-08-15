@@ -63,11 +63,20 @@ public class MachMsgType {
         this(name, size, longform, 1);
     }
 
-    /** Get this type's name value. */
+    /** Get this type descriptor's name value. */
     public final int value() { return name; }
+
+    /** Get this type descriptor's size field. */
+    public final boolean size() { return size; }
+
+    /** Get this type descriptor's longform bit. */
+    public final boolean longform() { return longform; }
 
     /** Get this type descriptor's number field. */
     public final int number() { return number; }
+
+    /** Length in bytes of the data associated with this type descriptor. */
+    public final int bytes() { return size() * number() / 8; }
 
     /**
      * Whether this is a port type.
