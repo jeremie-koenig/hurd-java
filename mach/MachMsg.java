@@ -10,7 +10,7 @@ import java.nio.ByteBuffer;
  *
  * <h3>Embedded port names and {@link MachPort} objects</h3>
  *
- * Mach messages store port names in their header and ini some of the
+ * Mach messages store port names in their header and in some of the
  * subsequent data items. To avoid port rights from being accidentally
  * deallocated or leaked, we must handle them carefully.
  *
@@ -77,7 +77,7 @@ public class MachMsg {
         /**
          * Prepare to read from the buffer.
          *
-         * We assume old port value was modified behind our back, and was
+         * We assume the old port value was modified behind our back, and was
          * deallocated as required by the associated type descriptor.
          */
         public void flip() throws Unsafe { 
@@ -101,6 +101,11 @@ public class MachMsg {
             } catch(Unsafe exc) {}
         }
 
+        /**
+         * Write the name encapsulated in {@param newPort} into the buffer. An
+         * external reference to the port name will be held until
+         * {@link #clear} is called.
+         */
         public void set(MachPort newPort, MachMsgType type) {
             if(!type.isPort())
                 throw new IllegalArgumentException();
@@ -123,6 +128,11 @@ public class MachMsg {
             } catch(Unsafe exc) {}
         }
 
+        /**
+         * Read the port name from the buffer and return a corresponding
+         * MachPort object. An external reference to the port name will be held
+         * until {@link #clear} is called.
+         */
         public MachPort get() {
             if(port == null) {
                 int name = buf.getInt(index);

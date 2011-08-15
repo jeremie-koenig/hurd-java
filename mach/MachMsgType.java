@@ -15,6 +15,13 @@ import java.nio.ByteBuffer;
  * the end of the type descriptor being read or written. Users are advised to
  * set the buffer's mark before using these methods and restore it if an
  * exception occurs.
+ *
+ * <h3>Safety guarantees</h3>
+ *
+ * In the current implementation, enough methods are {@code final} to guarantee
+ * that the data written by the {@link #put} methods will match the values
+ * returned by the accessors. However, {@link MachMsgType} is intended
+ * as a helper class and arbitrary instances should not be trusted.
  */
 public class MachMsgType {
     /* Constants for mach_msg_type_t */
