@@ -19,10 +19,10 @@ public class HelloMach {
         msg.setId(21000);
 
         /* Data */
-        msg.putChar("Hello in Java!\n".getBytes());
+        msg.putBytes("Hello in Java!\n".getBytes());
 
         /* Offset */
-        msg.putInteger64(-1);
+        msg.putLong(-1);
 
         try {
             int err = Mach.msg(msg.buf(),
@@ -35,10 +35,10 @@ public class HelloMach {
             msg.flip();
         } catch(Unsafe e) {}
 
-        int retcode = msg.getInteger32();
+        int retcode = msg.getInt();
         System.out.println("retcode = " + retcode);
 
-        int amount = msg.getInteger32();
+        int amount = msg.getInt();
         System.out.println("amount = " + amount);
 
         reply.deallocate();

@@ -191,8 +191,8 @@ public class MachMsgType {
      * Whereas {@link MachMsgType} itself handles reading and writing arbitrary
      * type descriptors from {@link java.nio.ByteBuffer} objects, this class
      * provides the additionnal functionnality required for the predefined type
-     * descriptor templates, namely the ability to write variations on a given
-     * descriptor and to check arbitrary descriptors against this one.
+     * descriptor templates, namely the ability to instanciate variations on a
+     * given descriptor and to check arbitrary descriptors against this one.
      */
     public static class Template extends MachMsgType {
         /* Pre-constructed proto-header */
@@ -273,6 +273,13 @@ public class MachMsgType {
                 throw new TypeCheckException(String.format(
                     "Type check error: msgt_number was %d (expected %d)",
                     actualNumber, expectedNumber));
+        }
+
+        /* Instanciate variations */
+
+        public final MachMsgType withNumber(int number) {
+            return new MachMsgType(name(), size(), number, inl(),
+                    longform(), deallocate());
         }
     }
 

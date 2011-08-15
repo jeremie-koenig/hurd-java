@@ -305,68 +305,33 @@ public class MachMsg {
 
     /* Writing data items */
 
-    static private interface PutOperation {
+    private static interface PutOperation {
         void operate();
     }
 
-    private void atomicPut(PutOperation op) {
+    private synchronized MachMsg atomicPut(MachMsgType type, boolean port,
+                                           PutOperation op)
+        throws TypeCheckException
+    {
         buf.mark();
         try {
+            if(port != type.isPort())
+                throw new TypeCheckException(String.format(
+                    "attempt to read %s item as a %s",
+                    type.isPort() ? "port" : "non-port",
+                    port ? "port" : "non-port"));
+
+            type.put(buf);
+            int pos = buf.position();
             op.operate();
-        } catch(Error exc) {
-            buf.reset();
-            throw exc;
-        } catch(RuntimeException exc) {
-            buf.reset();
-            throw exc;
-        }
-    }
+            int bytes = buf.position() - pos;
 
-    /**
-     * Append a {@code MACH_MSG_TYPE_CHAR} data item to this message.
-     */
-    public synchronized MachMsg putChar(final byte ch) {
-        atomicPut(new PutOperation() {
-            public void operate() {
-                MachMsgType.CHAR.put(buf);
-                buf.put(ch);
-            }
-        });
-        return this;
-    }
-    public synchronized MachMsg putChar(final byte[] src) {
-        atomicPut(new PutOperation() {
-            public void operate() {
-                MachMsgType.CHAR.put(buf, src.length);
-                buf.put(src);
-            }
-        });
-        return this;
-    }
+            if(bytes != type.bytes())
+                throw new TypeCheckException(String.format(
+                    "data item is %d bytes long, type descriptor requires %d",
+                    bytes, type.bytes()));
 
-    /**
-     * Append a {@code MACH_MSG_TYPE_INTEGER_64} data item to this message.
-     */
-    public synchronized MachMsg putInteger64(final long value) {
-        atomicPut(new PutOperation() {
-            public void operate() {
-                MachMsgType.INTEGER_64.put(buf);
-                buf.putLong(value);
-            }
-        });
-        return this;
-    }
-
-    /* Reading data items */
-
-    private static interface GetOperation {
-        void operate() throws TypeCheckException;
-    }
-
-    private void atomicGet(GetOperation op) throws TypeCheckException {
-        buf.mark();
-        try {
-            op.operate();
+            return this;
         } catch(Error exc) {
             buf.reset();
             throw exc;
@@ -379,17 +344,303 @@ public class MachMsg {
         }
     }
 
-    /**
-     * Read a {@code MACH_MSG_TYPE_INTEGER_32} data item from this message.
-     */
-    public synchronized int getInteger32() throws TypeCheckException {
-        final int[] value = new int[1];
-        atomicGet(new GetOperation() {
-            public void operate() throws TypeCheckException {
-                MachMsgType.INTEGER_32.check(buf, 1);
-                value[0] = buf.getInt();
+    /* This mirrors the relative put methods in ByteBuffer. */
+
+    /** Append a single-byte data item to this message. */
+    public MachMsg putByte(MachMsgType type, final byte data)
+        throws TypeCheckException
+    {
+        return atomicPut(type, false, new PutOperation() {
+            public void operate() { buf.put(data); }
+        });
+    }
+
+    /** Append a data item to this message as a {@code byte} array. */
+    public MachMsg putBytes(MachMsgType type, final byte[] data)
+        throws TypeCheckException
+    {
+        return atomicPut(type, false, new PutOperation() {
+            public void operate() { buf.put(data); }
+        });
+    }
+
+    /** Append a 2-bytes data item to this message as a {@code short} value. */
+    public MachMsg putShort(MachMsgType type, final short data)
+        throws TypeCheckException
+    {
+        return atomicPut(type, false, new PutOperation() {
+            public void operate() { buf.putShort(data); }
+        });
+    }
+
+    /** Append a 4-bytes data item to this message as an {@code int} value. */
+    public MachMsg putInt(MachMsgType type, final int data)
+        throws TypeCheckException
+    {
+        return atomicPut(type, false, new PutOperation() {
+            public void operate() { buf.putInt(data); }
+        });
+    }
+
+    /** Append an 8-bytes data item to this message as a {@code long} value. */
+    public MachMsg putLong(MachMsgType type, final long data)
+        throws TypeCheckException
+    {
+        return atomicPut(type, false, new PutOperation() {
+            public void operate() { buf.putLong(data); }
+        });
+    }
+
+    /* Convenience versions using predefined types */
+
+    /** Append a {@code MACH_MSG_TYPE_CHAR} data item to this message. */
+    public MachMsg putByte(final byte data)
+    {
+        try {
+            putByte(MachMsgType.CHAR, data);
+        } catch(TypeCheckException exc) {
+            assert false;
+        }
+        return this;
+    }
+
+    /** Append a {@code MACH_MSG_TYPE_CHAR} data item to this message. */
+    public MachMsg putBytes(final byte[] data)
+    {
+        MachMsgType type = MachMsgType.CHAR.withNumber(data.length);
+        try {
+            putBytes(type, data);
+        } catch(TypeCheckException exc) {
+            assert false;
+        }
+        return this;
+    }
+
+    /** Append a {@code MACH_MSG_TYPE_INTEGER_32} data item to this message. */
+    public MachMsg putInt(final int data) {
+        try {
+            putInt(MachMsgType.INTEGER_32, data);
+        } catch(TypeCheckException exc) {
+            assert false;
+        }
+        return this;
+    }
+
+    /** Append a {@code MACH_MSG_TYPE_INTEGER_64} data item to this message. */
+    public MachMsg putLong(final long data) {
+        try {
+            putLong(MachMsgType.INTEGER_64, data);
+        } catch(TypeCheckException exc) {
+            assert false;
+        }
+        return this;
+    }
+
+    /* Reading data items */
+
+    private static interface GetOperation<T> {
+        T operate() throws TypeCheckException;
+    }
+
+    private synchronized <T> T atomicGet(MachMsgType.Template type, int number,
+                                         boolean port, GetOperation<T> op)
+        throws TypeCheckException
+    {
+        buf.mark();
+        try {
+            if(port != type.isPort())
+                throw new TypeCheckException(String.format(
+                    "attempt to read %s item as a %s",
+                    type.isPort() ? "port" : "non-port",
+                    port ? "port" : "non-port"));
+
+            type.check(buf, number);
+            int pos = buf.position();
+            T data = op.operate();
+            int bytes = buf.position() - pos;
+
+            if(bytes != type.bytes())
+                throw new TypeCheckException(String.format(
+                    "data item is %d bytes long, expected %d",
+                    type.bytes(), bytes));
+
+            return data;
+        } catch(Error exc) {
+            buf.reset();
+            throw exc;
+        } catch(RuntimeException exc) {
+            buf.reset();
+            throw exc;
+        } catch(TypeCheckException exc) {
+            buf.reset();
+            throw exc;
+        }
+    }
+
+    private static interface VariableGetOperation<T> {
+        T operate(int number) throws TypeCheckException;
+    }
+
+    private synchronized <T> T atomicVariableGet(MachMsgType.Template type,
+                                   boolean port, VariableGetOperation<T> op)
+        throws TypeCheckException
+    {
+        buf.mark();
+        try {
+            if(port != type.isPort())
+                throw new TypeCheckException(String.format(
+                    "attempt to read %s item as a %s",
+                    type.isPort() ? "port" : "non-port",
+                    port ? "port" : "non-port"));
+
+            int number = type.check(buf);
+            int pos = buf.position();
+            T data = op.operate(number);
+            int bytes = buf.position() - pos;
+
+            if(bytes != type.bytes())
+                throw new TypeCheckException(String.format(
+                    "data item is %d bytes long, expected %d",
+                    type.bytes(), bytes));
+
+            return data;
+        } catch(Error exc) {
+            buf.reset();
+            throw exc;
+        } catch(RuntimeException exc) {
+            buf.reset();
+            throw exc;
+        } catch(TypeCheckException exc) {
+            buf.reset();
+            throw exc;
+        }
+    }
+
+    /** Read a single-byte data item from this message. */
+    public byte getByte(MachMsgType.Template type, int number)
+        throws TypeCheckException
+    {
+        return atomicGet(type, number, false, new GetOperation<Byte>() {
+            public Byte operate() { return buf.get(); }
+        });
+    }
+
+    /** Read a fixed-length data item from this message as a byte array. */
+    public byte[] getBytes(final MachMsgType.Template type, final int number)
+        throws TypeCheckException
+    {
+        return atomicGet(type, number, false, new GetOperation<byte[]>() {
+            public byte[] operate() {
+                byte[] data = new byte[type.size() * number / 8];
+                buf.get(data);
+                return data;
             }
         });
-        return value[0];
+    }
+
+    /** Read a variable-length data item from this message as a byte array. */
+    public byte[] getBytes(final MachMsgType.Template type)
+        throws TypeCheckException
+    {
+        return atomicVariableGet(type, false, new VariableGetOperation<byte[]>() {
+            public byte[] operate(int number) {
+                byte[] data = new byte[type.size() * number / 8];
+                buf.get(data);
+                return data;
+            }
+        });
+    }
+
+    /** Read a two-byte data item from this message as a {@code short} value. */
+    public short getShort(MachMsgType.Template type, int number)
+        throws TypeCheckException
+    {
+        return atomicGet(type, number, false, new GetOperation<Short>() {
+            public Short operate() { return buf.getShort(); }
+        });
+    }
+
+    /** Read a four-bytes data item from this message as an {@code int} value. */
+    public int getInt(MachMsgType.Template type, int number)
+        throws TypeCheckException
+    {
+        return atomicGet(type, number, false, new GetOperation<Integer>() {
+            public Integer operate() { return buf.getInt(); }
+        });
+    }
+
+    /** Read an 8-bytes data item from this message as an {@code long} value. */
+    public long getLong(MachMsgType.Template type, int number)
+        throws TypeCheckException
+    {
+        return atomicGet(type, number, false, new GetOperation<Long>() {
+            public Long operate() { return buf.getLong(); }
+        });
+    }
+
+    /** Read a port from this message. */
+    public MachPort getPort(MachMsgType.Template type)
+        throws TypeCheckException
+    {
+        /* NB: it's important that we read the name first, and only instanciate
+         * a MachPort object once we're sure no type check error is going to
+         * occur; otherwise we could consume extra Mach user references by
+         * attempting to read the same one multiple times. */
+
+        int name = atomicGet(type, 1, true, new GetOperation<Integer>() {
+            public Integer operate() { return buf.getInt(); }
+        });
+
+        MachPort port = null;
+        try { port = new MachPort(name); } catch(Unsafe exc) {}
+
+        return port;
+    }
+
+    /** Read a port array from this message. */
+    public MachPort[] getPorts(MachMsgType.Template type)
+        throws TypeCheckException
+    {
+        /* NB: the same as above applies. */
+
+        int[] names = atomicVariableGet(type, true,
+            new VariableGetOperation<int[]>() {
+                public int[] operate(int number) {
+                    int[] data = new int[number];
+                    for(int i = 0; i < number; i++)
+                        data[i] = buf.getInt();
+                    return data;
+                }
+            });
+
+        MachPort[] ports = new MachPort[names.length];
+        try { 
+            for(int i = 0; i < names.length; i++)
+                ports[i] = new MachPort(names[i]);
+        } catch(Unsafe exc) {}
+
+        return ports;
+    }
+
+    /* Convenience versions using predefined types */
+
+    /** Read a {@code MACH_MSG_TYPE_CHAR} data item from this message. */
+    public byte getByte() throws TypeCheckException {
+        return getByte(MachMsgType.CHAR, 1);
+    }
+
+    /** Read a {@code MACH_MSG_TYPE_CHAR} data item from this message. */
+    public byte[] getBytes() throws TypeCheckException {
+        return getBytes(MachMsgType.CHAR);
+    }
+
+    /** Read a {@code MACH_MSG_TYPE_INTEGER_32} data item from this message. */
+    public int getInt() throws TypeCheckException {
+        return getInt(MachMsgType.INTEGER_32, 1);
+    }
+
+    /** Read a {@code MACH_MSG_TYPE_INTEGER_64} data item from this message. */
+    public long getLong() throws TypeCheckException {
+        return getLong(MachMsgType.INTEGER_64, 1);
     }
 }
